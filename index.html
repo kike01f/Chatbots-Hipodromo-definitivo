@@ -3136,7 +3136,13 @@ const ARTURITO_GADGET_KB_SEED = [
         autorRol: autor?.rol || '',
         tipo: estadoCambio ? 'status_update' : 'comment',
         estadoNuevo: estadoCambio ? estado : null,
-        adjuntos: adjuntos.map((a) => ({ name: a.name, url: a.url, mimeType: a.mimeType }))
+        adjuntos: adjuntos.map((a) => ({
+          name: a.name,
+          url: a.url || '',
+          mimeType: a.mimeType,
+          size: a.size || 0,
+          storagePath: a.storagePath || ''
+        }))
       };
 
       await this.addResponse(ticketId, {
@@ -8840,7 +8846,7 @@ const TicketLookupModule = {
 
     if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.tickets?.getById) {
       ticket = await ArturitoCloud.tickets.getById(ticketId, { forceServer: true });
-      if (ticket && !(ticket.historialResidente || []).length) {
+      if (ticket) {
         responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
       }
     }
@@ -8853,48 +8859,118 @@ const TicketLookupModule = {
     }
 
     if (!ticket) return null;
-    return { ticket, responses };
+    const entries = await this.buildFullTimeline(ticket, responses);
+    ticket.attachments = await this.enrichAttachments(ticket.attachments || []);
+    return { ticket, responses, entries };
   },
 
-  timelineEntries(ticket, responses) {
-    const hist = (ticket.historialResidente || []).filter((h) => h && h.mensaje);
-    if (hist.length) {
-      return hist.map((h) => ({
-        fecha: h.fecha,
-        mensaje: h.mensaje,
-        autorNombre: h.autorNombre,
-        tipo: h.tipo,
-        estadoNuevo: h.estadoNuevo,
-        adjuntos: h.adjuntos || []
-      }));
+  _entryKey(e) {
+    return `${e.fecha || 0}|${String(e.mensaje || '').slice(0, 48)}|${e.estadoNuevo || ''}`;
+  },
+
+  _mapHistEntry(h) {
+    return {
+      fecha: h.fecha,
+      mensaje: h.mensaje,
+      autorNombre: h.autorNombre || 'Administración',
+      autorRol: h.autorRol || '',
+      tipo: h.tipo || 'comment',
+      estadoNuevo: h.estadoNuevo || null,
+      adjuntos: h.adjuntos || []
+    };
+  },
+
+  _mapResponseEntry(r) {
+    return {
+      fecha: r.fecha,
+      mensaje: r.mensaje,
+      autorNombre: r.autorNombre || 'Administración',
+      autorRol: r.autorRol || '',
+      tipo: r.tipo || r.estadoNuevo ? 'status_update' : 'comment',
+      estadoNuevo: r.estadoNuevo || null,
+      adjuntos: r.adjuntos || []
+    };
+  },
+
+  async buildFullTimeline(ticket, responses) {
+    const merged = new Map();
+    const hist = (ticket.historialResidente || []).filter((h) => h && (h.mensaje || h.estadoNuevo));
+    hist.forEach((h) => merged.set(this._entryKey(this._mapHistEntry(h)), this._mapHistEntry(h)));
+
+    (responses || [])
+      .filter((r) => r.visibleToResidente !== false && (r.mensaje || r.estadoNuevo))
+      .forEach((r) => {
+        const entry = this._mapResponseEntry(r);
+        const key = this._entryKey(entry);
+        if (!merged.has(key)) merged.set(key, entry);
+      });
+
+    const entries = Array.from(merged.values()).sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
+    for (const entry of entries) {
+      entry.adjuntos = await this.enrichAttachments(entry.adjuntos || []);
     }
-    return (responses || []).filter((r) => r.visibleToResidente !== false);
+    return entries;
+  },
+
+  async enrichAttachments(atts) {
+    const list = (atts || []).map((a) => TicketAttachmentModule.normalize(a)).filter(Boolean);
+    const out = [];
+    for (const n of list) {
+      if (n.url) {
+        out.push(n);
+        continue;
+      }
+      if (n.storagePath && typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled()) {
+        try {
+          const { ref, getDownloadURL } = ArturitoCloud.fb._modules;
+          n.url = await getDownloadURL(ref(ArturitoCloud.fb.storage, n.storagePath));
+        } catch (err) {
+          console.warn('[TicketLookup] URL adjunto:', n.name, err);
+        }
+      }
+      out.push(n);
+    }
+    return out;
+  },
+
+  formatAttachmentLinks(atts, indent = '  ') {
+    const list = (atts || []).filter(Boolean);
+    if (!list.length) return '';
+    return list.map((a) => {
+      const name = a.name || 'documento';
+      const size = a.size ? ` (${formatBytes(a.size)})` : '';
+      return a.url ? `${indent}📎 [${name}](${a.url})${size}` : `${indent}📎 ${name}${size}`;
+    }).join('\n');
+  },
+
+  formatInitialAttachments(ticket) {
+    const atts = ticket.attachments || [];
+    if (!atts.length) return '';
+    let block = `\n\n**Documentos de tu solicitud:**\n${this.formatAttachmentLinks(atts)}`;
+    return block;
   },
 
   formatTimeline(entries) {
-    if (!entries?.length) return '_Aún no hay comentarios del equipo. Te avisaremos aquí cuando haya novedades._';
-    return entries.slice(-8).map((r) => {
+    if (!entries?.length) return '_Aún no hay gestiones del equipo. Te avisaremos aquí cuando haya novedades._';
+    return entries.map((r, idx) => {
       const who = r.autorNombre ? `**${r.autorNombre}**` : '**Administración**';
+      const role = r.autorRol ? ` (${r.autorRol})` : '';
       const when = fmtDate(r.fecha);
-      let line = `• ${when} — ${who}`;
-      if (r.tipo === 'status_update' && r.estadoNuevo) line += ` _(Estado → ${r.estadoNuevo})_`;
-      line += `\n  ${String(r.mensaje || '').trim()}`;
-      const atts = (r.adjuntos || []).filter(Boolean);
-      if (atts.length) {
-        const links = atts.map((a) => {
-          const name = a.name || 'documento';
-          return a.url ? `[${name}](${a.url})` : name;
-        });
-        line += '\n  📎 ' + links.join(', ');
+      const n = idx + 1;
+      let line = `**Gestión ${n}** · ${when} · ${who}${role}`;
+      if (r.tipo === 'status_update' && r.estadoNuevo) {
+        line += `\n  🔄 **Estado actualizado → ${r.estadoNuevo}**`;
       }
+      if (r.mensaje) line += `\n  💬 ${String(r.mensaje).trim()}`;
+      const attBlock = this.formatAttachmentLinks(r.adjuntos, '  ');
+      if (attBlock) line += `\n${attBlock}`;
       return line;
     }).join('\n\n');
   },
 
-  formatStatusText(ticket, responses) {
+  formatStatusText(ticket, responses, entries) {
     const hint = this.estadoHint(ticket.estado);
-    const attCount = (ticket.attachments || []).length;
-    const entries = this.timelineEntries(ticket, responses);
+    const timeline = entries || [];
     const updated = ticket.ultimaRespuestaAt || ticket.updatedAt || ticket.createdAt;
 
     let text = [
@@ -8904,20 +8980,19 @@ const TicketLookupModule = {
       `**Categoría:** ${ticket.categoria}`,
       `**Prioridad:** ${ticket.prioridad}`,
       `**Departamento:** ${ticket.departamento || '—'}`,
+      `**Residente:** ${ticket.nombre || '—'}`,
       `**Creada:** ${fmtDate(ticket.createdAt)}`,
-      `**Última actualización:** ${fmtDate(updated)}`,
-      attCount ? `**Adjuntos iniciales:** ${attCount} archivo(s)` : ''
-    ].filter(Boolean).join('\n');
+      `**Última actualización:** ${fmtDate(updated)}`
+    ].join('\n');
 
     if (ticket.descripcion) {
-      text += `\n\n**Descripción:**\n${String(ticket.descripcion).trim()}`;
-    }
-    if (ticket.ultimaRespuesta) {
-      text += `\n\n**Último mensaje del equipo:**\n${String(ticket.ultimaRespuesta).trim()}`;
+      text += `\n\n**Tu solicitud original:**\n${String(ticket.descripcion).trim()}`;
     }
 
-    text += `\n\n**Historial de seguimiento:**\n${this.formatTimeline(entries)}`;
-    text += '\n\n_🔄 Esta información se actualiza en tiempo real. Vuelve a escribir el número de ticket para refrescar._';
+    text += this.formatInitialAttachments(ticket);
+
+    text += `\n\n**Historial de gestiones (${timeline.length}):**\n${this.formatTimeline(timeline)}`;
+    text += '\n\n_🔄 Se actualiza en tiempo real cuando administración responde o adjunta documentos._';
 
     if (['Resuelto', 'Cerrado'].includes(ticket.estado)) {
       text += '\n\nSi necesitas reabrir el caso, escribe "crear ticket" con el detalle.';
@@ -8934,7 +9009,7 @@ const TicketLookupModule = {
       };
     }
     return {
-      text: this.formatStatusText(data.ticket, data.responses),
+      text: this.formatStatusText(data.ticket, data.responses, data.entries),
       actions: null,
       ticketId,
       liveWatch: true
@@ -8961,11 +9036,10 @@ const TicketLookupModule = {
       const conv = ChatModule.getCurrent();
       const msg = conv?.messages?.find((m) => m.id === msgId);
       if (!msg || !ticket) return;
-      let responses = [];
-      if (!(ticket.historialResidente || []).length) {
-        responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
-      }
-      msg.text = this.formatStatusText(ticket, responses);
+      let responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
+      ticket.attachments = await this.enrichAttachments(ticket.attachments || []);
+      const entries = await this.buildFullTimeline(ticket, responses);
+      msg.text = this.formatStatusText(ticket, responses, entries);
       DatabaseModule.save();
       ChatModule.renderMessages('bot-start');
     });
@@ -10925,7 +10999,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v14-ticket-email';",
+    "const CACHE_NAME='arturito-ai-v15-full-timeline';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
