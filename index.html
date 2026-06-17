@@ -682,6 +682,10 @@ body.mode-client #adminApp{display:none!important}
 .ticket-timeline-atts a{font-size:.75rem;color:var(--primary);text-decoration:none}
 .ticket-manage-compose{border:1px dashed var(--border);border-radius:12px;padding:.75rem;background:var(--bg)}
 .ticket-manage-compose label{font-size:.78rem;font-weight:600;color:var(--text-muted)}
+.ticket-manage-channels{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;padding:.65rem .75rem;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.ticket-manage-channels label{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:500;color:var(--text);cursor:pointer;margin:0}
+.ticket-manage-channels .ticket-hint{width:100%;margin:0;font-size:.75rem}
+.ticket-channel-badge{display:inline-block;font-size:.68rem;font-weight:700;padding:.12rem .45rem;border-radius:999px;background:rgba(13,148,136,.12);color:var(--primary);margin-left:.35rem}
 .ticket-manage-empty{font-size:.82rem;color:var(--text-muted);padding:.5rem 0}
 #modalTicket .btn-primary .ui-icon,#modalTicket .btn-primary svg{color:#fff}
 @media(max-width:520px){
@@ -1188,6 +1192,7 @@ body.mode-client #adminApp{display:none!important}
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" required></div>
+            <div class="form-group full"><label>URL app residentes (consulta ticket)</label><input type="url" id="setPublicAppUrl" placeholder="https://kike01f.github.io/Chatbots-Hipodromo-definitivo/"></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-hipodromo.web.app/admin"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en extensions/firestore-send-email.env"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="mayordomoactivahipodromo1876@gmail.com" readonly></div>
@@ -1304,6 +1309,14 @@ body.mode-client #adminApp{display:none!important}
             <button type="button" class="btn btn-secondary btn-sm" id="btnManageAttach"><span data-icon="document" data-icon-size="sm"></span> Adjuntar archivos</button>
             <input type="file" id="tmFileInput" multiple hidden accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.txt,.xlsx,.xls">
             <ul class="ticket-attach-list" id="tmAttachList"></ul>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Enviar respuesta por</label>
+          <div class="ticket-manage-channels" id="tmCanales">
+            <label><input type="checkbox" id="tmCanalChat" checked> Chat (consulta de ticket)</label>
+            <label><input type="checkbox" id="tmCanalEmail"> Correo al residente</label>
+            <p class="ticket-hint" id="tmCanalHint">El residente verá la respuesta al consultar su número de ticket en el chat.</p>
           </div>
         </div>
         <div class="form-group full" style="display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap">
@@ -2963,7 +2976,7 @@ const ARTURITO_GADGET_KB_SEED = [
       await deleteDoc(doc(this.fb.col('tickets'), id));
     }
 
-    async addResponse(ticketId, { usuarioId, mensaje, adjuntos = [], tipo, estadoNuevo, autorNombre, autorRol }) {
+    async addResponse(ticketId, { usuarioId, mensaje, adjuntos = [], tipo, estadoNuevo, autorNombre, autorRol, visibleToResidente = true, canales = [] }) {
       const { addDoc } = this.fb._modules;
       const ref = await addDoc(this.fb.col('ticket_responses'), {
         ticketId,
@@ -2974,7 +2987,8 @@ const ARTURITO_GADGET_KB_SEED = [
         estadoNuevo: estadoNuevo || null,
         autorNombre: autorNombre || '',
         autorRol: autorRol || '',
-        visibleToResidente: true,
+        visibleToResidente: visibleToResidente !== false,
+        canales: Array.isArray(canales) ? canales : [],
         fecha: Date.now()
       });
       return ref.id;
@@ -3111,10 +3125,11 @@ const ARTURITO_GADGET_KB_SEED = [
       );
     }
 
-    async addStaffResponse(ticketId, { mensaje, estado, files = [], autor }) {
+    async addStaffResponse(ticketId, { mensaje, estado, files = [], autor, notifyChat = true, notifyEmail = false }) {
       const { updateDoc, doc, arrayUnion } = this.fb._modules;
       const ticket = await this.getById(ticketId);
       if (!ticket) throw new Error('Ticket no encontrado');
+      if (!notifyChat && !notifyEmail) throw new Error('Selecciona al menos un canal de envío');
 
       const adjuntos = [];
       for (const file of files || []) {
@@ -3129,6 +3144,7 @@ const ARTURITO_GADGET_KB_SEED = [
       }
 
       const estadoCambio = estado && estado !== ticket.estado;
+      const canales = [notifyChat && 'chat', notifyEmail && 'email'].filter(Boolean);
       const histEntry = {
         fecha: Date.now(),
         mensaje,
@@ -3136,6 +3152,7 @@ const ARTURITO_GADGET_KB_SEED = [
         autorRol: autor?.rol || '',
         tipo: estadoCambio ? 'status_update' : 'comment',
         estadoNuevo: estadoCambio ? estado : null,
+        canales,
         adjuntos: adjuntos.map((a) => ({
           name: a.name,
           url: a.url || '',
@@ -3152,41 +3169,32 @@ const ARTURITO_GADGET_KB_SEED = [
         tipo: estadoCambio ? 'status_update' : 'comment',
         estadoNuevo: estadoCambio ? estado : null,
         autorNombre: autor?.nombre || 'Administración',
-        autorRol: autor?.rol || ''
+        autorRol: autor?.rol || '',
+        visibleToResidente: notifyChat,
+        canales
       });
 
-      const patch = {
-        fechaActualizacion: Date.now(),
-        ultimaRespuesta: mensaje,
-        ultimaRespuestaAt: Date.now()
-      };
-      if (estadoCambio) patch.estado = estado;
-      if (adjuntos.length) {
-        patch.adjuntos = [...(ticket.attachments || []), ...adjuntos];
-      }
       const ticketRef = doc(this.fb.col('tickets'), ticketId);
-      const prevHist = ticket.historialResidente || [];
-      await updateDoc(ticketRef, {
-        ...(estadoCambio ? { estado } : {}),
+      const updatePayload = {
         fechaActualizacion: Date.now(),
-        ultimaRespuesta: mensaje,
-        ultimaRespuestaAt: Date.now(),
-        historialResidente: arrayUnion ? arrayUnion(histEntry) : [...prevHist, histEntry],
+        ...(estadoCambio ? { estado } : {}),
+        ...(notifyChat ? { ultimaRespuesta: mensaje, ultimaRespuestaAt: Date.now() } : {}),
+        ...(notifyChat ? { historialResidente: arrayUnion ? arrayUnion(histEntry) : [...(ticket.historialResidente || []), histEntry] } : {}),
         ...(adjuntos.length ? { adjuntos: [...(ticket.attachments || []).map((a) => this.normalizeAttachment(a)).filter(Boolean), ...adjuntos] } : {})
-      });
+      };
+      await updateDoc(ticketRef, updatePayload);
 
       const local = database.tickets.find((t) => t.id === ticketId);
       if (local) {
         Object.assign(local, {
-          estado: patch.estado || local.estado,
-          updatedAt: patch.fechaActualizacion,
-          ultimaRespuesta: mensaje,
-          ultimaRespuestaAt: patch.ultimaRespuestaAt,
-          attachments: patch.adjuntos || local.attachments
+          estado: estadoCambio ? estado : local.estado,
+          updatedAt: updatePayload.fechaActualizacion,
+          ...(notifyChat ? { ultimaRespuesta: mensaje, ultimaRespuestaAt: updatePayload.ultimaRespuestaAt || Date.now() } : {}),
+          attachments: adjuntos.length ? updatePayload.adjuntos : local.attachments
         });
         DatabaseModule.save();
       }
-      return { estadoCambio, adjuntos };
+      return { estadoCambio, adjuntos, canales, notifyChat, notifyEmail, estadoAnterior: ticket.estado };
     }
 
     watchTickets(callback) {
@@ -3274,13 +3282,13 @@ const ARTURITO_GADGET_KB_SEED = [
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
   ];
   const CLOUD_EMAIL_KEYS = [
-    'notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
@@ -3526,6 +3534,9 @@ const ARTURITO_GADGET_KB_SEED = [
       if (!String(merged.adminPanelUrl || '').trim() && local?.adminPanelUrl) {
         merged.adminPanelUrl = local.adminPanelUrl;
       }
+      if (!String(merged.publicAppUrl || '').trim() && local?.publicAppUrl) {
+        merged.publicAppUrl = local.publicAppUrl;
+      }
       if (merged.ticketEmailMode !== 'extension') {
         merged.ticketEmailMode = 'extension';
       }
@@ -3694,10 +3705,13 @@ const ARTURITO_GADGET_KB_SEED = [
         const val = localVal || String(defs[key] ?? '').trim();
         if (val) patch[key] = val;
       };
-      ['notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+      ['notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
         'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType'].forEach(pick);
       if (!String(remote.adminPanelUrl || '').trim() && database.settings.adminPanelUrl) {
         patch.adminPanelUrl = database.settings.adminPanelUrl;
+      }
+      if (!String(remote.publicAppUrl || '').trim() && database.settings.publicAppUrl) {
+        patch.publicAppUrl = database.settings.publicAppUrl;
       }
       const remoteMode = String(remote.ticketEmailMode || '').trim();
       if (remoteMode !== 'extension') {
@@ -3743,6 +3757,7 @@ const ARTURITO_GADGET_KB_SEED = [
         gadgetCategories: s.gadgetCategories ? JSON.parse(JSON.stringify(s.gadgetCategories)) : {},
         gadgetCategoryOrder: Array.isArray(s.gadgetCategoryOrder) ? s.gadgetCategoryOrder.slice() : [],
         notifyAdminEmail: s.notifyAdminEmail || defs.notifyAdminEmail || 'conserjeria.wm815@gmail.com',
+        publicAppUrl: s.publicAppUrl || DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin',
         smtpConnectionUri: s.smtpConnectionUri || defs.smtpConnectionUri || '',
         smtpFromEmail: s.smtpFromEmail || defs.smtpFromEmail || '',
@@ -4708,6 +4723,7 @@ const DatabaseModule = {
         adminKey: 'admin123',
         theme: 'light',
         notifyAdminEmail: 'conserjeria.wm815@gmail.com',
+        publicAppUrl: DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: 'https://chatbots-hipodromo.web.app/admin',
         smtpConnectionUri: 'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
         smtpFromEmail: 'conserjeria.wm815@gmail.com',
@@ -4730,6 +4746,7 @@ const DatabaseModule = {
       portalHint:'Consulta horarios, gastos comunes, reservas o crea solicitudes.\n\nHaz clic en **Arturito** en la esquina inferior derecha.',
       adminKey:'admin123', theme:'light',
       notifyAdminEmail:'conserjeria.wm815@gmail.com',
+      publicAppUrl: DEFAULT_PUBLIC_APP_URL,
       adminPanelUrl:'https://chatbots-hipodromo.web.app/admin',
       smtpConnectionUri:'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
       smtpFromEmail:'conserjeria.wm815@gmail.com',
@@ -6371,6 +6388,7 @@ const SettingsModule = {
     set('setWelcomeMsg', s.welcomeMessage, 'value');
     const defs = window.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     set('setNotifyAdminEmail', s.notifyAdminEmail || defs.notifyAdminEmail || '', 'value');
+    set('setPublicAppUrl', s.publicAppUrl || DEFAULT_PUBLIC_APP_URL, 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin', 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
     set('setMailCollection', s.mailCollection || defs.mailCollection || 'mail', 'value');
@@ -6432,6 +6450,7 @@ const SettingsModule = {
       return;
     }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || 'https://chatbots-hipodromo.web.app/admin';
+    database.settings.publicAppUrl = document.getElementById('setPublicAppUrl').value.trim().replace(/\/$/, '') || DEFAULT_PUBLIC_APP_URL;
     database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
     database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
     database.settings.firestoreLocation = database.settings.firestoreLocation || 'southamerica-west1';
@@ -8120,6 +8139,9 @@ const ChatModule = {
   }
 };
 
+/* URL pública donde los residentes consultan tickets (botón en correo de confirmación) */
+const DEFAULT_PUBLIC_APP_URL = 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo';
+
 /* ─── TicketEmailDebug — diagnóstico en consola del envío de correos ─── */
 const TicketEmailDebug = {
   updateSmtpStatusIndicator() {
@@ -8431,7 +8453,7 @@ const TicketEmailDebug = {
   },
   buildTicketStatusUrl(ticketId, settings) {
     const s = settings || database.settings || {};
-    const raw = s.publicAppUrl || s.adminPanelUrl || 'https://chatbots-hipodromo.web.app';
+    const raw = s.publicAppUrl || DEFAULT_PUBLIC_APP_URL;
     const base = String(raw).replace(/\/admin\/?$/i, '').replace(/\/$/, '');
     return `${base}/?ticket=${encodeURIComponent(ticketId)}`;
   },
@@ -8473,6 +8495,92 @@ const TicketEmailDebug = {
       'Consulta el estado con el botón del correo o ingresando tu número de ticket en el chat.'
     ].join('\n');
     return { subject, html, text, statusUrl };
+  },
+  buildClientResponsePayload(ticketId, ticket, { mensaje, estado, estadoAnterior, adjuntos = [] }, settings) {
+    const s = settings || database.settings || {};
+    const buildingName = s.buildingName || 'Edificio';
+    const primary = s.primaryColor || '#0d9488';
+    const statusUrl = this.buildTicketStatusUrl(ticketId, s);
+    const esc = (v) => this._escapeHtml(v);
+    const estadoCambio = estado && estado !== estadoAnterior;
+    const attList = (adjuntos || []).map((a) => ({
+      name: a.name || a.nombre || 'adjunto',
+      url: a.url || ''
+    })).filter((a) => a.name || a.url);
+    const adjuntosHtml = attList.length
+      ? `<ul style="margin:8px 0 0;padding-left:1.2rem">${attList.map((a) => a.url
+        ? `<li><a href="${esc(a.url)}">${esc(a.name)}</a></li>`
+        : `<li>${esc(a.name)}</li>`).join('')}</ul>`
+      : '';
+    const subject = `[${buildingName}] Actualización solicitud ${ticketId}${estadoCambio ? ' — ' + estado : ''}`;
+    const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;max-width:560px">
+      <div style="background:${esc(primary)};color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
+        <h2 style="margin:0;font-size:20px">${esc(buildingName)}</h2>
+        <p style="margin:6px 0 0;opacity:.92">Actualización de tu solicitud</p>
+      </div>
+      <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;background:#fff">
+        <p style="margin:0 0 16px">Hola <strong>${esc(ticket.nombre || 'residente')}</strong>, el equipo de administración respondió tu solicitud <strong>${esc(ticketId)}</strong>.</p>
+        ${estadoCambio ? `<p style="margin:0 0 12px"><strong>Estado:</strong> ${esc(estadoAnterior || '—')} → <strong>${esc(estado)}</strong></p>` : `<p style="margin:0 0 12px"><strong>Estado actual:</strong> ${esc(estado || ticket.estado || '—')}</p>`}
+        <div style="background:#f8fafc;border-left:4px solid ${esc(primary)};padding:12px 14px;border-radius:0 8px 8px 0;margin-bottom:16px">
+          <div style="font-size:12px;color:${esc(primary)};font-weight:700;text-transform:uppercase;margin-bottom:6px">Mensaje del equipo</div>
+          <p style="margin:0;white-space:pre-wrap">${esc(mensaje)}</p>
+          ${adjuntosHtml}
+        </div>
+        <p style="margin:0 0 12px">Consulta el detalle completo cuando quieras:</p>
+        <p style="margin:0"><a href="${esc(statusUrl)}" style="display:inline-block;background:${esc(primary)};color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Consultar estado de mi solicitud</a></p>
+      </div>
+    </div>`;
+    const text = [
+      `Actualización — ${buildingName}`,
+      '',
+      `Hola ${ticket.nombre || 'residente'},`,
+      '',
+      `Solicitud: ${ticketId}`,
+      estadoCambio ? `Estado: ${estadoAnterior || '—'} → ${estado}` : `Estado: ${estado || ticket.estado || '—'}`,
+      '',
+      'Mensaje del equipo:',
+      mensaje,
+      attList.length ? `\nAdjuntos: ${attList.map((a) => a.name).join(', ')}` : '',
+      '',
+      'Consulta el estado con el botón del correo o ingresando tu número de ticket en el chat.'
+    ].filter(Boolean).join('\n');
+    return { subject, html, text, statusUrl };
+  },
+  responseMailId(ticketId) {
+    return `${ticketId}-resp-${Date.now()}`;
+  },
+  async queueClientResponseMail(ticketId, ticket, responseData, settingsIn) {
+    const clientEmail = this._parseEmails(ticket?.email)[0];
+    if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+      this.warn('Sin correo válido del residente — no se envía respuesta por email', { ticketId, email: ticket?.email });
+      return null;
+    }
+    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return null;
+    const settings = settingsIn || database.settings || {};
+    const mailId = this.responseMailId(ticketId);
+    const { doc, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const mailRef = doc(ArturitoCloud.fb.db, 'mail', mailId);
+    const email = this.buildClientResponsePayload(ticketId, ticket, responseData, settings);
+    const adminReply = this._parseEmails(settings?.smtpReplyTo || settings?.notifyAdminEmail)[0];
+    await setDoc(mailRef, {
+      to: clientEmail,
+      replyTo: adminReply || undefined,
+      message: { subject: email.subject, html: email.html, text: email.text },
+      createdAt: serverTimestamp(),
+      status: 'pending',
+      meta: {
+        tipo: 'ticket_response',
+        ticketId,
+        condominioId: typeof ArturitoCloud !== 'undefined' ? ArturitoCloud.fb.getCondominioId() : 'hipodromo',
+        source: 'app',
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'artutitohipodromo02',
+        statusUrl: email.statusUrl,
+        createdAt: serverTimestamp()
+      }
+    });
+    this.log('✓ Respuesta residente encolada por correo', { mailId, path: `mail/${mailId}`, to: clientEmail });
+    void this.watchMailDelivery(mailId, 12, false);
+    return mailId;
   },
   buildTicketEmailPayload(ticketId, ticket, settings) {
     const s = settings || database.settings || {};
@@ -9082,7 +9190,31 @@ const TicketLookupModule = {
 /* ─── TicketManageModule — gestión admin (respuesta, estado, adjuntos) ─── */
 const TicketManageModule = {
   _ticketId: null,
+  _currentTicket: null,
   _pendingFiles: [],
+
+  _channelBadges(canales) {
+    const map = { chat: 'Chat', email: 'Correo' };
+    return (canales || []).map((c) => `<span class="ticket-channel-badge">${map[c] || c}</span>`).join('');
+  },
+
+  _updateCanalHint(ticket) {
+    const hint = document.getElementById('tmCanalHint');
+    const emailCb = document.getElementById('tmCanalEmail');
+    if (!hint) return;
+    const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(ticket?.email || '').trim());
+    if (emailCb) {
+      emailCb.disabled = !hasEmail;
+      if (!hasEmail) emailCb.checked = false;
+    }
+    const chat = document.getElementById('tmCanalChat')?.checked;
+    const mail = document.getElementById('tmCanalEmail')?.checked;
+    if (!hasEmail && chat) hint.textContent = 'El residente verá la respuesta al consultar su número de ticket en el chat.';
+    else if (!hasEmail) hint.textContent = 'Este residente no tiene correo válido; solo puedes publicar en el chat.';
+    else if (chat && mail) hint.textContent = 'Se publicará en el chat y se enviará un correo a ' + ticket.email + '.';
+    else if (mail) hint.textContent = 'Solo se enviará por correo a ' + ticket.email + ' (no aparecerá en la consulta del chat).';
+    else hint.textContent = 'Solo se publicará en el chat al consultar el ticket.';
+  },
 
   init() {
     document.getElementById('btnTicketManageSubmit')?.addEventListener('click', () => void this.submit());
@@ -9098,6 +9230,8 @@ const TicketManageModule = {
         this.renderPendingFiles();
       }
     });
+    document.getElementById('tmCanalChat')?.addEventListener('change', () => this._updateCanalHint(this._currentTicket));
+    document.getElementById('tmCanalEmail')?.addEventListener('change', () => this._updateCanalHint(this._currentTicket));
     const estadoSel = document.getElementById('tmEstado');
     if (estadoSel) estadoSel.innerHTML = STATUSES.map((s) => `<option value="${s}">${s}</option>`).join('');
   },
@@ -9151,6 +9285,7 @@ const TicketManageModule = {
     ul.innerHTML = responses.map((r) => {
       const cls = r.tipo === 'status_update' ? 'status-change' : '';
       const meta = [fmtDate(r.fecha), r.autorNombre || 'Administración', r.autorRol || ''].filter(Boolean).join(' · ');
+      const badges = this._channelBadges(r.canales?.length ? r.canales : (r.visibleToResidente === false ? ['email'] : ['chat']));
       const attHtml = (r.adjuntos || []).map((a) => {
         const n = TicketAttachmentModule.normalize(a);
         if (!n) return '';
@@ -9158,7 +9293,7 @@ const TicketManageModule = {
         return `<span>${escapeHtml(n.name)}</span>`;
       }).filter(Boolean).join('');
       return `<li class="${cls}">
-        <div class="ticket-timeline-meta">${escapeHtml(meta)}${r.estadoNuevo ? ' · Estado → ' + escapeHtml(r.estadoNuevo) : ''}</div>
+        <div class="ticket-timeline-meta">${escapeHtml(meta)}${badges}${r.estadoNuevo ? ' · Estado → ' + escapeHtml(r.estadoNuevo) : ''}</div>
         <div class="ticket-timeline-msg">${escapeHtml(r.mensaje || '')}</div>
         ${attHtml ? `<div class="ticket-timeline-atts">${attHtml}</div>` : ''}
       </li>`;
@@ -9167,11 +9302,16 @@ const TicketManageModule = {
 
   async open(ticketId) {
     this._ticketId = ticketId;
+    this._currentTicket = null;
     this._pendingFiles = [];
     this.renderPendingFiles();
     document.getElementById('tmMensaje').value = '';
+    const chatCb = document.getElementById('tmCanalChat');
+    const emailCb = document.getElementById('tmCanalEmail');
+    if (chatCb) chatCb.checked = true;
+    if (emailCb) emailCb.checked = false;
     document.getElementById('ticketManageTitle').textContent = 'Solicitud ' + ticketId;
-    document.getElementById('ticketManageSub').textContent = 'Respuesta al residente · visible al consultar en el chat';
+    document.getElementById('ticketManageSub').textContent = 'Elige si enviar la respuesta por chat, correo o ambos';
 
     let ticket = database.tickets.find((t) => t.id === ticketId);
     let responses = [];
@@ -9187,9 +9327,11 @@ const TicketManageModule = {
       toast('Ticket no encontrado', 'error');
       return;
     }
+    this._currentTicket = ticket;
     document.getElementById('tmEstado').value = ticket.estado || 'Abierto';
     this.renderSummary(ticket);
     this.renderTimeline(responses);
+    this._updateCanalHint(ticket);
     openModal('modalTicketManage');
     hydrateIcons(document.getElementById('modalTicketManage'));
   },
@@ -9201,6 +9343,17 @@ const TicketManageModule = {
     if (!ticketId) return;
     if (!mensaje) {
       toast('Escribe un comentario para el residente', 'warning');
+      return;
+    }
+    const notifyChat = document.getElementById('tmCanalChat')?.checked;
+    const notifyEmail = document.getElementById('tmCanalEmail')?.checked;
+    if (!notifyChat && !notifyEmail) {
+      toast('Selecciona al menos un canal: chat o correo', 'warning');
+      return;
+    }
+    const ticket = this._currentTicket || database.tickets.find((t) => t.id === ticketId);
+    if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(ticket?.email || '').trim())) {
+      toast('El residente no tiene correo válido para envío por email', 'warning');
       return;
     }
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
@@ -9215,19 +9368,38 @@ const TicketManageModule = {
     if (btn) btn.disabled = true;
     try {
       const autor = AuthModule.currentUser || { nombre: 'Administración', rol: '' };
-      await ArturitoCloud.tickets.addStaffResponse(ticketId, {
+      const result = await ArturitoCloud.tickets.addStaffResponse(ticketId, {
         mensaje,
         estado,
         files: this._pendingFiles.slice(),
-        autor
+        autor,
+        notifyChat,
+        notifyEmail
       });
+      if (notifyEmail && ticket) {
+        await TicketEmailDebug.queueClientResponseMail(ticketId, ticket, {
+          mensaje,
+          estado,
+          estadoAnterior: result.estadoAnterior,
+          adjuntos: result.adjuntos
+        });
+      }
       this._pendingFiles = [];
       this.renderPendingFiles();
       document.getElementById('tmMensaje').value = '';
-      toast('Respuesta publicada — el residente la verá al consultar el ticket', 'success');
+      const toastMsg = notifyChat && notifyEmail
+        ? 'Respuesta publicada en el chat y enviada por correo'
+        : notifyEmail
+          ? 'Respuesta enviada por correo al residente'
+          : 'Respuesta publicada en el chat';
+      toast(toastMsg, 'success');
       const responses = await ArturitoCloud.tickets.listResponses(ticketId);
-      const ticket = await ArturitoCloud.tickets.getById(ticketId);
-      if (ticket) this.renderSummary(ticket);
+      const updated = await ArturitoCloud.tickets.getById(ticketId);
+      if (updated) {
+        this._currentTicket = updated;
+        this.renderSummary(updated);
+        this._updateCanalHint(updated);
+      }
       this.renderTimeline(responses);
       TicketModule.render();
       AdminModule.render();
@@ -10997,7 +11169,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v15-full-timeline';",
+    "const CACHE_NAME='arturito-ai-v16-admin-channels';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
