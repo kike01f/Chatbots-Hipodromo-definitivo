@@ -8420,6 +8420,56 @@ const TicketEmailDebug = {
   _parseEmails(raw) {
     return String(raw || '').split(/[,;]/).map((e) => e.trim()).filter(Boolean);
   },
+  clientMailId(ticketId) {
+    return `${ticketId}-client`;
+  },
+  buildTicketStatusUrl(ticketId, settings) {
+    const s = settings || database.settings || {};
+    const raw = s.publicAppUrl || s.adminPanelUrl || 'https://chatbots-hipodromo.web.app';
+    const base = String(raw).replace(/\/admin\/?$/i, '').replace(/\/$/, '');
+    return `${base}/?ticket=${encodeURIComponent(ticketId)}`;
+  },
+  buildClientConfirmationPayload(ticketId, ticket, settings) {
+    const s = settings || database.settings || {};
+    const buildingName = s.buildingName || 'Edificio';
+    const primary = s.primaryColor || '#0d9488';
+    const statusUrl = this.buildTicketStatusUrl(ticketId, s);
+    const esc = (v) => this._escapeHtml(v);
+    const subject = `[${buildingName}] Confirmación solicitud ${ticketId}`;
+    const html = `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;max-width:560px">
+      <div style="background:${esc(primary)};color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
+        <h2 style="margin:0;font-size:20px">${esc(buildingName)}</h2>
+        <p style="margin:6px 0 0;opacity:.92">Tu solicitud fue registrada</p>
+      </div>
+      <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;background:#fff">
+        <p style="margin:0 0 16px">Hola <strong>${esc(ticket.nombre || 'residente')}</strong>, recibimos tu solicitud. El equipo la revisará pronto.</p>
+        <div style="background:#ecfdf5;border-left:4px solid ${esc(primary)};padding:12px 14px;border-radius:0 8px 8px 0;margin-bottom:16px">
+          <div style="font-size:12px;color:${esc(primary)};font-weight:700;text-transform:uppercase">Número de ticket</div>
+          <div style="font-size:22px;font-weight:700;margin-top:4px">${esc(ticketId)}</div>
+        </div>
+        <p style="margin:0 0 8px"><strong>Categoría:</strong> ${esc(ticket.categoria || '—')}</p>
+        <p style="margin:0 0 8px"><strong>Departamento:</strong> ${esc(ticket.departamento || '—')}</p>
+        <p style="margin:0 0 20px"><strong>Estado inicial:</strong> ${esc(ticket.estado || 'Abierto')}</p>
+        <p style="margin:0 0 12px">Consulta el avance cuando quieras:</p>
+        <p style="margin:0 0 16px"><a href="${esc(statusUrl)}" style="display:inline-block;background:${esc(primary)};color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Consultar estado de mi solicitud</a></p>
+        <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all">Enlace: <a href="${esc(statusUrl)}">${esc(statusUrl)}</a></p>
+      </div>
+    </div>`;
+    const text = [
+      `Confirmación — ${buildingName}`,
+      '',
+      `Hola ${ticket.nombre || 'residente'},`,
+      '',
+      `Tu solicitud fue registrada.`,
+      `Número de ticket: ${ticketId}`,
+      `Categoría: ${ticket.categoria || '—'}`,
+      `Departamento: ${ticket.departamento || '—'}`,
+      '',
+      'Consulta el estado aquí:',
+      statusUrl
+    ].join('\n');
+    return { subject, html, text, statusUrl };
+  },
   buildTicketEmailPayload(ticketId, ticket, settings) {
     const s = settings || database.settings || {};
     const buildingName = s.buildingName || 'Edificio';
@@ -8489,6 +8539,7 @@ const TicketEmailDebug = {
         database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'artutitohipodromo02'
       });
       void this.watchMailDelivery(ticketId);
+      void this.queueClientConfirmationMail(ticketId, ticket, settings);
       return ticketId;
     }
     await setDoc(mailRef, {
@@ -8513,7 +8564,46 @@ const TicketEmailDebug = {
       to: to.join(', ')
     });
     void this.watchMailDelivery(ticketId);
+    void this.queueClientConfirmationMail(ticketId, ticket, settings);
     return ticketId;
+  },
+  async queueClientConfirmationMail(ticketId, ticket, settingsIn) {
+    const clientEmail = this._parseEmails(ticket?.email)[0];
+    if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+      this.warn('Sin correo válido del residente — no se envía confirmación', { ticketId, email: ticket?.email });
+      return null;
+    }
+    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return null;
+    const settings = settingsIn || database.settings || {};
+    const mailId = this.clientMailId(ticketId);
+    const { doc, getDoc, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const mailRef = doc(ArturitoCloud.fb.db, 'mail', mailId);
+    const existing = await getDoc(mailRef);
+    if (existing.exists()) {
+      this.log('Confirmación residente ya encolada', { path: `mail/${mailId}` });
+      return mailId;
+    }
+    const email = this.buildClientConfirmationPayload(ticketId, ticket, settings);
+    const adminReply = this._parseEmails(settings?.smtpReplyTo || settings?.notifyAdminEmail)[0];
+    await setDoc(mailRef, {
+      to: clientEmail,
+      replyTo: adminReply || undefined,
+      message: { subject: email.subject, html: email.html, text: email.text },
+      createdAt: serverTimestamp(),
+      status: 'pending',
+      meta: {
+        tipo: 'ticket_confirmation',
+        ticketId,
+        condominioId: typeof ArturitoCloud !== 'undefined' ? ArturitoCloud.fb.getCondominioId() : 'hipodromo',
+        source: 'app',
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'artutitohipodromo02',
+        statusUrl: email.statusUrl,
+        createdAt: serverTimestamp()
+      }
+    });
+    this.log('✓ Confirmación residente encolada', { mailId, path: `mail/${mailId}`, to: clientEmail });
+    void this.watchMailDelivery(mailId, 12, false);
+    return mailId;
   },
   /** Espera delivery (Trigger Email) y muestra toast al usuario */
   async watchMailDelivery(mailId, maxAttempts = 15, notifyUser = false) {
@@ -8570,9 +8660,19 @@ const TicketEmailDebug = {
   async afterTicketCreated(ticketId, ticket) {
     this.log('✓ Ticket creado — mail/' + ticketId, { ticketId, mailPath: `mail/${ticketId}`, database: 'artutitohipodromo02' });
     toast('Ticket creado correctamente.', 'success');
-    const result = await this.watchMailDelivery(ticketId, 15, true);
+    const clientEmail = this._parseEmails(ticket?.email)[0];
+    if (clientEmail) {
+      toast(`Enviando confirmación a ${clientEmail}…`, 'info');
+    }
+    const [adminResult] = await Promise.all([
+      this.watchMailDelivery(ticketId, 15, false),
+      this.watchMailDelivery(this.clientMailId(ticketId), 15, false)
+    ]);
+    if (clientEmail) {
+      toast(`Revisa ${clientEmail}: confirmación con ticket ${ticketId} y enlace de seguimiento.`, 'success');
+    }
     await this.audit('Post-creación ticket');
-    return result;
+    return adminResult;
   }
 };
 window.TicketEmailDebug = TicketEmailDebug;
@@ -9400,7 +9500,10 @@ const TicketModule = {
         }
         if (App.mode === 'client' && ChatModule.getCurrent()) {
           const attNote = ticket.attachments.length ? ` Se adjuntaron ${ticket.attachments.length} documento(s).` : '';
-          ChatModule.addBotMessage('Tu solicitud **' + newId + '** fue registrada.' + attNote + ' Para ver el estado, escribe ese número en el chat (ej. `' + newId + '`).');
+          const emailNote = ticket.email
+            ? ` Te enviamos confirmación a **${ticket.email}** con el número **${newId}** y el enlace para consultar el estado.`
+            : ` Para ver el estado, escribe **${newId}** en el chat.`;
+          ChatModule.addBotMessage('Tu solicitud **' + newId + '** fue registrada.' + attNote + emailNote);
         }
       }
       DatabaseModule.save(); closeModal('modalTicket'); this.resetAttachments(); this.render(); AdminModule.render(); ReportModule.render();
@@ -10822,7 +10925,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v13-tickets-live';",
+    "const CACHE_NAME='arturito-ai-v14-ticket-email';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
