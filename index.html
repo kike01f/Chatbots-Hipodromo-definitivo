@@ -1156,11 +1156,16 @@ body.mode-client #adminApp{display:none!important}
             <div class="form-group full" style="margin-top:.5rem;padding-top:1rem;border-top:1px dashed var(--border)">
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
-            <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="activawalkermartinez815@gmail.com" required></div>
+            <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" required></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-hipodromo.web.app/admin"></div>
-            <div class="form-group"><label>Gmail remitente (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="tu@gmail.com" autocomplete="username"></div>
+            <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username"></div>
+            <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="mayordomoactivahipodromo1876@gmail.com"></div>
             <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="16 caracteres sin espacios" autocomplete="new-password"></div>
             <div class="form-group full"><label>O URI SMTP completa (opcional)</label><input type="password" id="setSmtpConnectionUri" autocomplete="off" placeholder="smtps://...@smtp.gmail.com:465"></div>
+            <div class="form-group"><label>Colección de correo</label><input type="text" id="setMailCollection" value="mail" readonly></div>
+            <div class="form-group"><label>Autenticación SMTP</label><input type="text" id="setSmtpAuthType" value="Username &amp; Password" readonly></div>
+            <div class="form-group"><label>Puerto / TLS</label><input type="text" id="setSmtpPort" value="465 (smtps, seguro)" readonly></div>
+            <div class="form-group"><label>TTL documentos mail</label><input type="text" id="setFirestoreTtl" value="Never" readonly></div>
             <div class="form-group"><label>Modo de envío</label><select id="setTicketEmailMode"><option value="auto">Automático (SMTP del panel — recomendado)</option><option value="extension">Cola mail/ (processMailQueue)</option><option value="smtp">Solo SMTP del panel</option></select></div>
             <p id="smtpConfigStatus" class="ticket-hint" style="margin:0 0 .5rem"></p>
             <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se escribe <code>mail/TK-…</code> (misma base <strong>artutitohipodromo02</strong>). La Cloud Function <strong>processMailQueue</strong> envía el Gmail. Si no llega: <code>bash deploy.sh</code>.</p>
@@ -1171,7 +1176,7 @@ body.mode-client #adminApp{display:none!important}
           </form>
           <div class="firebase-config-card">
             <h3>Firebase Cloud</h3>
-            <p>Proyecto <strong>chatbots-hipodromo</strong>. Firestore: base <strong>artutitohipodromo02</strong>. Todo el conocimiento, tickets y configuración se respaldan en la nube. Editable en tiempo real desde el panel.</p>
+            <p>Proyecto <strong>chatbots-hipodromo</strong>. Firestore: base <strong>artutitohipodromo02</strong> · región <strong>Santiago (southamerica-west1)</strong>. Cola de correo: colección raíz <strong>mail/</strong>. Todo el conocimiento, tickets y configuración se respaldan en la nube.</p>
             <form id="firebaseConfigForm" class="form-grid">
               <div class="form-group"><label>API Key</label><input type="text" id="fbApiKey" autocomplete="off" value="AIzaSyBocB2dUQCo2CB3rpFDWvsoUZzS1v-g5Qg"></div>
               <div class="form-group"><label>Auth Domain</label><input type="text" id="fbAuthDomain" value="chatbots-hipodromo.firebaseapp.com"></div>
@@ -1180,7 +1185,8 @@ body.mode-client #adminApp{display:none!important}
               <div class="form-group"><label>Messaging Sender ID</label><input type="text" id="fbMessagingSenderId" value="138621852452"></div>
               <div class="form-group"><label>App ID</label><input type="text" id="fbAppId" value="1:138621852452:web:43ee805662e0d39bf331b1"></div>
               <div class="form-group full"><label>ID Condominio (multi-tenant)</label><input type="text" id="fbCondominioId" value="hipodromo"></div>
-              <div class="form-group full"><label>Base de datos Firestore</label><input type="text" id="fbFirestoreDatabaseId" value="artutitohipodromo02" placeholder="artutitohipodromo02"></div>
+              <div class="form-group"><label>Base de datos Firestore</label><input type="text" id="fbFirestoreDatabaseId" value="artutitohipodromo02" placeholder="artutitohipodromo02"></div>
+              <div class="form-group"><label>Ubicación Firestore</label><input type="text" id="fbFirestoreLocation" value="Santiago (southamerica-west1)" readonly></div>
               <div class="form-group full" style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button type="button" class="btn btn-secondary btn-sm" id="btnTestFirebase">Probar conexión</button>
                 <button type="submit" class="btn btn-primary btn-sm">Guardar y conectar</button>
@@ -2307,8 +2313,29 @@ const ARTURITO_GADGET_KB_SEED = [
     messagingSenderId: '138621852452',
     appId: '1:138621852452:web:43ee805662e0d39bf331b1',
     condominioId: 'hipodromo',
-    firestoreDatabaseId: 'artutitohipodromo02'
+    firestoreDatabaseId: 'artutitohipodromo02',
+    firestoreLocation: 'southamerica-west1',
+    firestoreLocationLabel: 'Santiago (southamerica-west1)'
   };
+
+  /** Alineado con extensión Trigger Email / Firebase Console */
+  const ARTURITO_FIREBASE_EMAIL_DEFAULTS = {
+    firestoreDatabaseId: 'artutitohipodromo02',
+    firestoreLocation: 'southamerica-west1',
+    firestoreLocationLabel: 'Santiago (southamerica-west1)',
+    mailCollection: 'mail',
+    smtpAuthType: 'UsernamePassword',
+    smtpAuthTypeLabel: 'Username & Password',
+    smtpConnectionUri: 'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+    smtpFromEmail: 'conserjeria.wm815@gmail.com',
+    smtpReplyTo: 'mayordomoactivahipodromo1876@gmail.com',
+    notifyAdminEmail: 'conserjeria.wm815@gmail.com',
+    smtpPort: 465,
+    smtpSecure: true,
+    firestoreTtlType: 'Never',
+    ticketEmailMode: 'auto'
+  };
+  global.ARTURITO_FIREBASE_EMAIL_DEFAULTS = ARTURITO_FIREBASE_EMAIL_DEFAULTS;
 
   if (!global.__ARTURITO_FIREBASE_CONFIG__) {
     global.__ARTURITO_FIREBASE_CONFIG__ = DEFAULT_FIREBASE_CONFIG;
@@ -2962,9 +2989,14 @@ const ARTURITO_GADGET_KB_SEED = [
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'ticketEmailMode',
+    'notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
+  ];
+  const CLOUD_EMAIL_KEYS = [
+    'notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
   class CloudSyncBridge {
@@ -3196,7 +3228,7 @@ const ARTURITO_GADGET_KB_SEED = [
       const merged = { ...(local || {}) };
       CLOUD_SETTINGS_KEYS.forEach((key) => {
         if (remote[key] !== undefined) {
-          if (['notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'ticketEmailMode'].includes(key)
+          if (CLOUD_EMAIL_KEYS.includes(key)
             && !String(remote[key] || '').trim() && local?.[key]) {
             return;
           }
@@ -3370,23 +3402,24 @@ const ARTURITO_GADGET_KB_SEED = [
         console.warn('[CloudSync] ensureTicketEmailSettings read:', err);
         return false;
       }
+      const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
       const patch = {};
-      const remoteEmail = String(remote.notifyAdminEmail || '').trim();
-      const localEmail = String(database.settings.notifyAdminEmail || '').trim() || 'activawalkermartinez815@gmail.com';
-      if (!remoteEmail) patch.notifyAdminEmail = localEmail;
+      const pick = (key) => {
+        const remoteVal = String(remote[key] ?? '').trim();
+        if (remoteVal) return;
+        const localVal = String(database.settings[key] ?? '').trim();
+        const val = localVal || String(defs[key] ?? '').trim();
+        if (val) patch[key] = val;
+      };
+      ['notifyAdminEmail', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+        'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType'].forEach(pick);
       if (!String(remote.adminPanelUrl || '').trim() && database.settings.adminPanelUrl) {
         patch.adminPanelUrl = database.settings.adminPanelUrl;
-      }
-      if (!String(remote.smtpConnectionUri || '').trim() && database.settings.smtpConnectionUri) {
-        patch.smtpConnectionUri = database.settings.smtpConnectionUri;
-      }
-      if (!String(remote.smtpFromEmail || '').trim() && database.settings.smtpFromEmail) {
-        patch.smtpFromEmail = database.settings.smtpFromEmail;
       }
       const remoteMode = String(remote.ticketEmailMode || '').trim();
       const hasRemoteSmtp = !!String(remote.smtpConnectionUri || '').trim();
       if (!remoteMode) {
-        patch.ticketEmailMode = hasRemoteSmtp ? 'auto' : (database.settings.ticketEmailMode || 'extension');
+        patch.ticketEmailMode = hasRemoteSmtp ? 'auto' : (database.settings.ticketEmailMode || defs.ticketEmailMode || 'extension');
       }
       if (!Object.keys(patch).length) {
         console.log('[TicketEmail] settings/main en Firestore', {
@@ -3410,6 +3443,7 @@ const ARTURITO_GADGET_KB_SEED = [
 
     sanitizeSettingsForCloud(settings) {
       const s = settings || {};
+      const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
       const payload = {
         buildingName: s.buildingName || '',
         logo: s.logo || '',
@@ -3427,11 +3461,16 @@ const ARTURITO_GADGET_KB_SEED = [
         chatMessages: s.chatMessages ? { ...s.chatMessages } : {},
         gadgetCategories: s.gadgetCategories ? JSON.parse(JSON.stringify(s.gadgetCategories)) : {},
         gadgetCategoryOrder: Array.isArray(s.gadgetCategoryOrder) ? s.gadgetCategoryOrder.slice() : [],
-        notifyAdminEmail: s.notifyAdminEmail || 'activawalkermartinez815@gmail.com',
+        notifyAdminEmail: s.notifyAdminEmail || defs.notifyAdminEmail || 'conserjeria.wm815@gmail.com',
         adminPanelUrl: s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin',
-        smtpConnectionUri: s.smtpConnectionUri || '',
-        smtpFromEmail: s.smtpFromEmail || '',
-        ticketEmailMode: s.ticketEmailMode || (String(s.smtpConnectionUri || '').trim() ? 'auto' : 'extension'),
+        smtpConnectionUri: s.smtpConnectionUri || defs.smtpConnectionUri || '',
+        smtpFromEmail: s.smtpFromEmail || defs.smtpFromEmail || '',
+        smtpReplyTo: s.smtpReplyTo || defs.smtpReplyTo || '',
+        mailCollection: s.mailCollection || defs.mailCollection || 'mail',
+        firestoreLocation: s.firestoreLocation || defs.firestoreLocation || 'southamerica-west1',
+        smtpAuthType: s.smtpAuthType || defs.smtpAuthType || 'UsernamePassword',
+        firestoreTtlType: s.firestoreTtlType || defs.firestoreTtlType || 'Never',
+        ticketEmailMode: s.ticketEmailMode || (String(s.smtpConnectionUri || defs.smtpConnectionUri || '').trim() ? 'auto' : 'extension'),
         chatAnalytics: s.chatAnalytics ? JSON.parse(JSON.stringify(s.chatAnalytics)) : {
           totalInteractions: 0, totalRatings: 0, ratingSum: 0, bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
         },
@@ -4386,11 +4425,16 @@ const DatabaseModule = {
         portalHint: 'Consulta horarios, gastos comunes, reservas o crea solicitudes.\n\nHaz clic en **Arturito** en la esquina inferior derecha.',
         adminKey: 'admin123',
         theme: 'light',
-        notifyAdminEmail: 'activawalkermartinez815@gmail.com',
+        notifyAdminEmail: 'conserjeria.wm815@gmail.com',
         adminPanelUrl: 'https://chatbots-hipodromo.web.app/admin',
-        smtpConnectionUri: '',
-        smtpFromEmail: '',
-        ticketEmailMode: 'extension'
+        smtpConnectionUri: 'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+        smtpFromEmail: 'conserjeria.wm815@gmail.com',
+        smtpReplyTo: 'mayordomoactivahipodromo1876@gmail.com',
+        mailCollection: 'mail',
+        firestoreLocation: 'southamerica-west1',
+        smtpAuthType: 'UsernamePassword',
+        firestoreTtlType: 'Never',
+        ticketEmailMode: 'auto'
       }
     };
   },
@@ -4403,11 +4447,16 @@ const DatabaseModule = {
       portalTagline:'Tu asistente Arturito disponible 24/7',
       portalHint:'Consulta horarios, gastos comunes, reservas o crea solicitudes.\n\nHaz clic en **Arturito** en la esquina inferior derecha.',
       adminKey:'admin123', theme:'light',
-      notifyAdminEmail:'activawalkermartinez815@gmail.com',
+      notifyAdminEmail:'conserjeria.wm815@gmail.com',
       adminPanelUrl:'https://chatbots-hipodromo.web.app/admin',
-      smtpConnectionUri:'',
-      smtpFromEmail:'',
-      ticketEmailMode:'extension',
+      smtpConnectionUri:'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+      smtpFromEmail:'conserjeria.wm815@gmail.com',
+      smtpReplyTo:'mayordomoactivahipodromo1876@gmail.com',
+      mailCollection:'mail',
+      firestoreLocation:'southamerica-west1',
+      smtpAuthType:'UsernamePassword',
+      firestoreTtlType:'Never',
+      ticketEmailMode:'auto',
       quickQuestions: DEFAULT_QUICK_QUESTIONS.slice(),
       chatShortcuts: DEFAULT_CHAT_SHORTCUTS.map(s => ({ ...s })),
       chatMessages: { ...DEFAULT_CHAT_MESSAGES },
@@ -6038,10 +6087,15 @@ const SettingsModule = {
     set('setPrimaryColor', s.primaryColor, 'value');
     set('setSecondaryColor', s.secondaryColor, 'value');
     set('setWelcomeMsg', s.welcomeMessage, 'value');
-    set('setNotifyAdminEmail', s.notifyAdminEmail || '', 'value');
+    const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+    set('setNotifyAdminEmail', s.notifyAdminEmail || defs.notifyAdminEmail || '', 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin', 'value');
+    set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
+    set('setMailCollection', s.mailCollection || defs.mailCollection || 'mail', 'value');
+    const authEl = document.getElementById('setSmtpAuthType');
+    if (authEl) authEl.value = defs.smtpAuthTypeLabel || 'Username & Password';
     const gmailEl = document.getElementById('setSmtpGmail');
-    if (gmailEl && !gmailEl.value) gmailEl.value = s.smtpFromEmail || s.smtpGmail || '';
+    if (gmailEl && !gmailEl.value) gmailEl.value = s.smtpFromEmail || defs.smtpFromEmail || '';
     const modeEl = document.getElementById('setTicketEmailMode');
     if (modeEl) modeEl.value = s.ticketEmailMode || (String(s.smtpConnectionUri || '').trim() ? 'auto' : 'extension');
     TicketEmailDebug.updateSmtpStatusIndicator();
@@ -6094,6 +6148,11 @@ const SettingsModule = {
       return;
     }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || 'https://chatbots-hipodromo.web.app/admin';
+    database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
+    database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
+    database.settings.firestoreLocation = database.settings.firestoreLocation || 'southamerica-west1';
+    database.settings.smtpAuthType = database.settings.smtpAuthType || 'UsernamePassword';
+    database.settings.firestoreTtlType = database.settings.firestoreTtlType || 'Never';
     const smtpUri = TicketEmailDebug.resolveSmtpFromForm();
     if (smtpUri) {
       database.settings.smtpConnectionUri = smtpUri;
@@ -7812,6 +7871,8 @@ const TicketEmailDebug = {
       notifyAdminEmail: local.notifyAdminEmail || '(vacío)',
       smtpConnectionUri: this._maskUri(local.smtpConnectionUri),
       smtpFromEmail: local.smtpFromEmail || '(vacío)',
+      smtpReplyTo: local.smtpReplyTo || '(vacío)',
+      mailCollection: local.mailCollection || 'mail',
       ticketEmailMode: local.ticketEmailMode || 'extension'
     });
     try {
@@ -7845,6 +7906,9 @@ const TicketEmailDebug = {
         notifyAdminEmail: s.notifyAdminEmail || '(vacío)',
         smtpConnectionUri: this._maskUri(s.smtpConnectionUri),
         smtpFromEmail: s.smtpFromEmail || '(vacío)',
+        smtpReplyTo: s.smtpReplyTo || '(vacío)',
+        mailCollection: s.mailCollection || 'mail',
+        firestoreLocation: s.firestoreLocation || 'southamerica-west1',
         ticketEmailMode: mode
       });
       this.log('Cloud Function', {
@@ -8037,8 +8101,9 @@ const TicketEmailDebug = {
     const settingsSnap = await this.readCloudSettings();
     const settings = settingsSnap.ok ? { ...database.settings, ...(settingsSnap.data || {}) } : database.settings;
     const recipients = this._parseEmails(settings?.notifyAdminEmail);
-    const to = recipients.length ? recipients : ['activawalkermartinez815@gmail.com'];
+    const to = recipients.length ? recipients : ['conserjeria.wm815@gmail.com'];
     const email = this.buildTicketEmailPayload(ticketId, ticket, settings);
+    const replyTo = ticket.email || settings?.smtpReplyTo || to[0];
     const { doc, getDoc, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
     const mailRef = doc(ArturitoCloud.fb.db, 'mail', ticketId);
     const existing = await getDoc(mailRef);
@@ -8053,7 +8118,7 @@ const TicketEmailDebug = {
     }
     await setDoc(mailRef, {
       to: to.length === 1 ? to[0] : to,
-      replyTo: ticket.email || to[0],
+      replyTo: replyTo,
       message: { subject: email.subject, html: email.html, text: email.text },
       meta: {
         tipo: 'ticket_created',
