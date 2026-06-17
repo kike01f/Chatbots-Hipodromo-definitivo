@@ -3005,7 +3005,7 @@ const ARTURITO_GADGET_KB_SEED = [
       await deleteDoc(doc(this.fb.col('tickets'), id));
     }
 
-    async addResponse(ticketId, { usuarioId, mensaje, adjuntos = [], tipo, estadoNuevo, autorNombre, autorRol, visibleToResidente = true, canales = [] }) {
+    async addResponse(ticketId, { usuarioId, mensaje, adjuntos = [], tipo, estadoNuevo, autorNombre, autorRol, visibleToResidente = true, canales = [], fecha = null }) {
       const { addDoc } = this.fb._modules;
       const ref = await addDoc(this.fb.col('ticket_responses'), {
         ticketId,
@@ -3018,7 +3018,7 @@ const ARTURITO_GADGET_KB_SEED = [
         autorRol: autorRol || '',
         visibleToResidente: visibleToResidente !== false,
         canales: Array.isArray(canales) ? canales : [],
-        fecha: Date.now()
+        fecha: fecha || Date.now()
       });
       return ref.id;
     }
@@ -3174,8 +3174,9 @@ const ARTURITO_GADGET_KB_SEED = [
 
       const estadoCambio = estado && estado !== ticket.estado;
       const canales = [notifyChat && 'chat', notifyEmail && 'email'].filter(Boolean);
+      const now = Date.now();
       const histEntry = {
-        fecha: Date.now(),
+        fecha: now,
         mensaje,
         autorNombre: autor?.nombre || 'Administración',
         autorRol: autor?.rol || '',
@@ -3200,7 +3201,8 @@ const ARTURITO_GADGET_KB_SEED = [
         autorNombre: autor?.nombre || 'Administración',
         autorRol: autor?.rol || '',
         visibleToResidente: notifyChat,
-        canales
+        canales,
+        fecha: now
       });
 
       const ticketRef = doc(this.fb.col('tickets'), ticketId);
@@ -9023,8 +9025,26 @@ const TicketLookupModule = {
     return { ticket, responses, entries };
   },
 
+  _normMsg(m) {
+    return String(m || '').trim().replace(/\s+/g, ' ');
+  },
+
   _entryKey(e) {
-    return `${e.fecha || 0}|${String(e.mensaje || '').slice(0, 48)}|${e.estadoNuevo || ''}`;
+    const msg = this._normMsg(e.mensaje).slice(0, 80);
+    const fechaBucket = Math.floor((e.fecha || 0) / 60000);
+    return `${fechaBucket}|${msg}|${e.estadoNuevo || ''}|${e.autorNombre || ''}`;
+  },
+
+  _isDuplicateEntry(entry, existing) {
+    const msg = this._normMsg(entry.mensaje);
+    if (!msg && !entry.estadoNuevo) return false;
+    return (existing || []).some((e) => {
+      const sameMsg = this._normMsg(e.mensaje) === msg;
+      const sameEstado = (e.estadoNuevo || null) === (entry.estadoNuevo || null);
+      const sameAuthor = String(e.autorNombre || '') === String(entry.autorNombre || '');
+      const closeTime = Math.abs((e.fecha || 0) - (entry.fecha || 0)) < 5 * 60 * 1000;
+      return sameMsg && sameEstado && sameAuthor && closeTime;
+    });
   },
 
   _mapHistEntry(h) {
@@ -9054,15 +9074,19 @@ const TicketLookupModule = {
   async buildFullTimeline(ticket, responses) {
     const merged = new Map();
     const hist = (ticket.historialResidente || []).filter((h) => h && (h.mensaje || h.estadoNuevo));
-    hist.forEach((h) => merged.set(this._entryKey(this._mapHistEntry(h)), this._mapHistEntry(h)));
+    const histEntries = hist.map((h) => this._mapHistEntry(h));
+    histEntries.forEach((entry) => merged.set(this._entryKey(entry), entry));
 
-    (responses || [])
+    const visibleResponses = (responses || [])
       .filter((r) => r.visibleToResidente !== false && (r.mensaje || r.estadoNuevo))
-      .forEach((r) => {
-        const entry = this._mapResponseEntry(r);
-        const key = this._entryKey(entry);
-        if (!merged.has(key)) merged.set(key, entry);
-      });
+      .map((r) => this._mapResponseEntry(r));
+
+    visibleResponses.forEach((entry) => {
+      const existing = Array.from(merged.values());
+      if (this._isDuplicateEntry(entry, existing)) return;
+      const key = this._entryKey(entry);
+      if (!merged.has(key)) merged.set(key, entry);
+    });
 
     const entries = Array.from(merged.values()).sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
     for (const entry of entries) {
@@ -11318,7 +11342,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v18-ticket-status-card';",
+    "const CACHE_NAME='arturito-ai-v19-timeline-dedup';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
