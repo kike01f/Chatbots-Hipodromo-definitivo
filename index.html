@@ -1220,7 +1220,7 @@ body.mode-client #adminApp{display:none!important}
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" required></div>
-            <div class="form-group full"><label>URL app residentes (consulta ticket)</label><input type="url" id="setPublicAppUrl" placeholder="https://kike01f.github.io/Chatbots-Hipodromo-definitivo/"></div>
+            <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://kike01f.github.io/Chatbots-Hipodromo-definitivo/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-hipodromo.web.app/admin"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en extensions/firestore-send-email.env"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="mayordomoactivahipodromo1876@gmail.com" readonly></div>
@@ -3568,6 +3568,7 @@ const ARTURITO_GADGET_KB_SEED = [
       if (!String(merged.publicAppUrl || '').trim() && local?.publicAppUrl) {
         merged.publicAppUrl = local.publicAppUrl;
       }
+      merged.publicAppUrl = typeof resolvePublicAppUrl === 'function' ? resolvePublicAppUrl() : merged.publicAppUrl;
       if (merged.ticketEmailMode !== 'extension') {
         merged.ticketEmailMode = 'extension';
       }
@@ -3744,8 +3745,9 @@ const ARTURITO_GADGET_KB_SEED = [
       if (!String(remote.publicAppUrl || '').trim() && database.settings.publicAppUrl) {
         patch.publicAppUrl = database.settings.publicAppUrl;
       }
-      if (!String(remote.publicAppUrl || '').trim() || isLegacyPublicAppUrl(remote.publicAppUrl)) {
-        patch.publicAppUrl = resolvePublicAppUrl(database.settings);
+      const canonical = typeof resolvePublicAppUrl === 'function' ? resolvePublicAppUrl() : 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo';
+      if (String(remote.publicAppUrl || '').trim().replace(/\/$/, '') !== canonical) {
+        patch.publicAppUrl = canonical;
       }
       const remoteMode = String(remote.ticketEmailMode || '').trim();
       if (remoteMode !== 'extension') {
@@ -6422,7 +6424,7 @@ const SettingsModule = {
     set('setWelcomeMsg', s.welcomeMessage, 'value');
     const defs = window.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     set('setNotifyAdminEmail', s.notifyAdminEmail || defs.notifyAdminEmail || '', 'value');
-    set('setPublicAppUrl', resolvePublicAppUrl(s), 'value');
+    set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin', 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
     set('setMailCollection', s.mailCollection || defs.mailCollection || 'mail', 'value');
@@ -6484,9 +6486,7 @@ const SettingsModule = {
       return;
     }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || 'https://chatbots-hipodromo.web.app/admin';
-    database.settings.publicAppUrl = resolvePublicAppUrl({
-      publicAppUrl: document.getElementById('setPublicAppUrl').value.trim()
-    });
+    database.settings.publicAppUrl = resolvePublicAppUrl();
     database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
     database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
     database.settings.firestoreLocation = database.settings.firestoreLocation || 'southamerica-west1';
@@ -8298,22 +8298,14 @@ const ChatModule = {
   }
 };
 
-/* URL pública donde los residentes consultan tickets (botón en correo de confirmación) */
+/* URL pública del chat residente — SIEMPRE usada en botones de correo */
 const DEFAULT_PUBLIC_APP_URL = 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo';
 
-function isLegacyPublicAppUrl(url) {
-  const u = String(url || '').trim();
-  if (!u) return true;
-  return /kike01f\.github\.io\/bots\b/i.test(u)
-    || /chatbots-hipodromo\.(web\.app|firebaseapp\.com)/i.test(u);
+function resolvePublicAppUrl() {
+  return DEFAULT_PUBLIC_APP_URL;
 }
 
-function resolvePublicAppUrl(settings) {
-  const configured = String((settings || database?.settings || {}).publicAppUrl || '').trim();
-  if (!configured || isLegacyPublicAppUrl(configured)) return DEFAULT_PUBLIC_APP_URL;
-  return configured.replace(/\/admin\/?$/i, '').replace(/\/$/, '');
-}
-
+window.DEFAULT_PUBLIC_APP_URL = DEFAULT_PUBLIC_APP_URL;
 window.resolvePublicAppUrl = resolvePublicAppUrl;
 
 /* ─── TicketEmailDebug — diagnóstico en consola del envío de correos ─── */
@@ -8625,9 +8617,8 @@ const TicketEmailDebug = {
   clientMailId(ticketId) {
     return `${ticketId}-client`;
   },
-  buildTicketStatusUrl(ticketId, settings) {
-    const base = resolvePublicAppUrl(settings || database.settings);
-    return `${base}/?ticket=${encodeURIComponent(ticketId)}`;
+  buildTicketStatusUrl(ticketId) {
+    return `${DEFAULT_PUBLIC_APP_URL}/?ticket=${encodeURIComponent(ticketId)}`;
   },
   buildClientConfirmationPayload(ticketId, ticket, settings) {
     const s = settings || database.settings || {};
@@ -11459,7 +11450,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v20-ai-intent';",
+    "const CACHE_NAME='arturito-ai-v21-email-chat-url';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
