@@ -1,10 +1,21 @@
 #!/bin/bash
 # ARTURITO AI — Despliegue producción (reglas + índices + Functions Gen2 + hosting)
-# Uso: bash deploy.sh   (requiere: firebase login)
+# Uso: bash deploy.sh
+# Auth sin login interactivo:
+#   • .secrets/firebase-sa.json
+#   • .secrets/firebase.env  (FIREBASE_TOKEN o GOOGLE_APPLICATION_CREDENTIALS)
 
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
+
+ENV_FILE="$ROOT/.secrets/firebase.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
 
 NODE_BIN=""
 if command -v node >/dev/null 2>&1; then
@@ -35,20 +46,22 @@ else
   FB="$ROOT/.tools/fb-cli/node_modules/.bin/firebase"
 fi
 
-if ! "$FB" login:list 2>&1 | grep -q '@'; then
-  echo ""
-  echo "⚠️  Sin sesión Firebase. Ejecuta: $FB login"
-  echo "   Luego: bash deploy.sh"
-  echo ""
-  exit 1
+SA_KEY="$ROOT/.secrets/firebase-sa.json"
+if [ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "$SA_KEY" ]; then
+  export GOOGLE_APPLICATION_CREDENTIALS="$SA_KEY"
+elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [[ "${GOOGLE_APPLICATION_CREDENTIALS}" != /* ]]; then
+  export GOOGLE_APPLICATION_CREDENTIALS="$ROOT/${GOOGLE_APPLICATION_CREDENTIALS#./}"
+fi
+if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+  echo "→ Auth: ${GOOGLE_APPLICATION_CREDENTIALS}"
+elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+  echo "→ Auth: FIREBASE_TOKEN"
 fi
 
 echo "══════════════════════════════════════════════"
 echo "  ARTURITO AI — Deploy producción"
 echo "  Firestore: artutitohipodromo02"
 echo "══════════════════════════════════════════════"
-
-"$FB" use chatbots-hipodromo 2>/dev/null || "$FB" use --add
 
 echo ""
 echo "→ [1/4] Dependencias Cloud Functions..."
@@ -62,9 +75,16 @@ echo ""
 echo "→ [2/4] Reglas Firestore (artutitohipodromo02)..."
 echo "→ [3/4] Índices + Storage + Functions Gen2 + Hosting..."
 
-"$FB" deploy \
+if ! "$FB" deploy \
   --only firestore:rules,firestore:indexes,storage:rules,functions,hosting \
-  --project chatbots-hipodromo
+  --project chatbots-hipodromo \
+  --non-interactive; then
+  echo ""
+  echo "❌ Deploy falló (auth). Configura credenciales:"
+  echo "   bash setup-firebase-sa.sh   (cuenta de servicio, recomendado)"
+  echo "   o .secrets/firebase.env con FIREBASE_TOKEN=..."
+  exit 1
+fi
 
 echo ""
 echo "══════════════════════════════════════════════"
