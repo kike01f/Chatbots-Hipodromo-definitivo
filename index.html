@@ -8457,8 +8457,7 @@ const TicketEmailDebug = {
         <p style="margin:0 0 8px"><strong>Departamento:</strong> ${esc(ticket.departamento || '—')}</p>
         <p style="margin:0 0 20px"><strong>Estado inicial:</strong> ${esc(ticket.estado || 'Abierto')}</p>
         <p style="margin:0 0 12px">Consulta el avance cuando quieras:</p>
-        <p style="margin:0 0 16px"><a href="${esc(statusUrl)}" style="display:inline-block;background:${esc(primary)};color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Consultar estado de mi solicitud</a></p>
-        <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all">Enlace: <a href="${esc(statusUrl)}">${esc(statusUrl)}</a></p>
+        <p style="margin:0"><a href="${esc(statusUrl)}" style="display:inline-block;background:${esc(primary)};color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Consultar estado de mi solicitud</a></p>
       </div>
     </div>`;
     const text = [
@@ -8471,8 +8470,7 @@ const TicketEmailDebug = {
       `Categoría: ${ticket.categoria || '—'}`,
       `Departamento: ${ticket.departamento || '—'}`,
       '',
-      'Consulta el estado aquí:',
-      statusUrl
+      'Consulta el estado con el botón del correo o ingresando tu número de ticket en el chat.'
     ].join('\n');
     return { subject, html, text, statusUrl };
   },
