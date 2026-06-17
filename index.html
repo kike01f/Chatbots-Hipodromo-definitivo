@@ -395,6 +395,34 @@ body.mode-client #adminApp{display:none!important}
 .chat-msg-body a.chat-external-link{color:var(--arturito-green-dark,#5a8501);text-decoration:underline;text-underline-offset:2px;cursor:pointer;word-break:break-all}
 .chat-msg-body a.chat-external-link:hover{opacity:.88}
 .chat-msg-row.propio .chat-msg-body a{color:#fff;text-decoration:underline}
+.ticket-status-card{--ticket-primary:var(--arturito-green,#0d9488);font-size:.84rem;line-height:1.5;text-align:left;max-width:100%;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.08);background:#fff;color:#1f2937;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.chat-msg-body .ticket-status-card{margin:-.1rem 0}
+.ticket-status-header{background:var(--ticket-primary);color:#fff;padding:.75rem .9rem}
+.ticket-status-header strong{display:block;font-size:.95rem;font-weight:700}
+.ticket-status-header span{display:block;font-size:.75rem;opacity:.92;margin-top:.15rem}
+.ticket-status-body{padding:.85rem .9rem 1rem}
+.ticket-status-id-box{background:#ecfdf5;border-left:3px solid var(--ticket-primary);padding:.55rem .7rem;border-radius:0 8px 8px 0;margin-bottom:.75rem}
+.ticket-status-id-label{display:block;font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--ticket-primary);letter-spacing:.04em}
+.ticket-status-id-value{display:block;font-size:1.05rem;font-weight:700;margin-top:.15rem;color:#111827;word-break:break-all}
+.ticket-status-meta{width:100%;border-collapse:collapse;margin-bottom:.75rem;font-size:.8rem}
+.ticket-status-meta th,.ticket-status-meta td{padding:.4rem .45rem;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
+.ticket-status-meta th{width:40%;color:#6b7280;font-weight:600;font-size:.72rem}
+.ticket-status-meta td{color:#111827;font-size:.8rem}
+.ticket-status-section{font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--ticket-primary);margin:1rem 0 .45rem;letter-spacing:.03em}
+.ticket-status-desc{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:.55rem .65rem;font-size:.82rem;word-break:break-word;line-height:1.55}
+.ticket-status-atts{list-style:none;padding:0;margin:.35rem 0 0}
+.ticket-status-atts li{margin:.3rem 0;font-size:.8rem;line-height:1.4}
+.ticket-att-size{color:#6b7280;font-size:.72rem}
+.ticket-status-timeline{display:flex;flex-direction:column;gap:.55rem}
+.ticket-status-entry{background:#f8fafc;border:1px solid #e5e7eb;border-left:3px solid var(--ticket-primary);border-radius:0 8px 8px 0;padding:.55rem .65rem}
+.ticket-entry-head{font-size:.72rem;color:#6b7280;margin-bottom:.35rem;line-height:1.45}
+.ticket-entry-num{font-weight:700;color:var(--ticket-primary)}
+.ticket-entry-role{font-weight:400;color:#9ca3af}
+.ticket-entry-status{font-size:.78rem;margin-bottom:.35rem;color:#374151}
+.ticket-entry-msg{font-size:.82rem;color:#111827;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.ticket-status-empty{font-size:.8rem;color:#6b7280;font-style:italic;margin:0;line-height:1.45}
+.ticket-status-foot{font-size:.72rem;color:#6b7280;margin:.65rem 0 0;line-height:1.45}
+.chat-msg-body .ticket-status-card a.chat-external-link{color:var(--ticket-primary);font-weight:600;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 .chat-msg-meta{display:flex;justify-content:flex-end;margin-top:.2rem}
 .chat-msg-time{font-size:.62rem;opacity:.85}
 .chat-msg-row.propio .chat-msg-time{color:rgba(255,255,255,.82)}
@@ -2411,6 +2439,7 @@ const ARTURITO_GADGET_KB_SEED = [
     smtpFromEmail: 'conserjeria.wm815@gmail.com',
     smtpReplyTo: 'mayordomoactivahipodromo1876@gmail.com',
     notifyAdminEmail: 'conserjeria.wm815@gmail.com',
+    publicAppUrl: 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo',
     smtpPort: 465,
     smtpSecure: true,
     firestoreTtlType: 'Never',
@@ -3712,6 +3741,9 @@ const ARTURITO_GADGET_KB_SEED = [
       }
       if (!String(remote.publicAppUrl || '').trim() && database.settings.publicAppUrl) {
         patch.publicAppUrl = database.settings.publicAppUrl;
+      }
+      if (!String(remote.publicAppUrl || '').trim() || isLegacyPublicAppUrl(remote.publicAppUrl)) {
+        patch.publicAppUrl = resolvePublicAppUrl(database.settings);
       }
       const remoteMode = String(remote.ticketEmailMode || '').trim();
       if (remoteMode !== 'extension') {
@@ -6388,7 +6420,7 @@ const SettingsModule = {
     set('setWelcomeMsg', s.welcomeMessage, 'value');
     const defs = window.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     set('setNotifyAdminEmail', s.notifyAdminEmail || defs.notifyAdminEmail || '', 'value');
-    set('setPublicAppUrl', s.publicAppUrl || DEFAULT_PUBLIC_APP_URL, 'value');
+    set('setPublicAppUrl', resolvePublicAppUrl(s), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || 'https://chatbots-hipodromo.web.app/admin', 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
     set('setMailCollection', s.mailCollection || defs.mailCollection || 'mail', 'value');
@@ -6450,7 +6482,9 @@ const SettingsModule = {
       return;
     }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || 'https://chatbots-hipodromo.web.app/admin';
-    database.settings.publicAppUrl = document.getElementById('setPublicAppUrl').value.trim().replace(/\/$/, '') || DEFAULT_PUBLIC_APP_URL;
+    database.settings.publicAppUrl = resolvePublicAppUrl({
+      publicAppUrl: document.getElementById('setPublicAppUrl').value.trim()
+    });
     database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
     database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
     database.settings.firestoreLocation = database.settings.firestoreLocation || 'southamerica-west1';
@@ -7864,6 +7898,8 @@ const ChatModule = {
     let bodyContent;
     if (isUser) {
       bodyContent = escapeHtml(m.text).replace(/\n/g, '<br>');
+    } else if (m.ticketStatus && m.ticketStatusHtml) {
+      bodyContent = m.ticketStatusHtml;
     } else if (m.topicsMenu) {
       bodyContent = formatBotText(m.text) + GadgetKBModule.generateTopicsMenuHTML();
     } else if (m.topicSuggestions?.length) {
@@ -7903,6 +7939,10 @@ const ChatModule = {
     const msg = { id: DatabaseModule.uid('msg'), type:'bot', text, time: Date.now(), actions };
     if (extra?.topicsMenu) msg.topicsMenu = true;
     if (extra?.topicSuggestions?.length) msg.topicSuggestions = extra.topicSuggestions;
+    if (extra?.ticketStatusHtml) {
+      msg.ticketStatus = true;
+      msg.ticketStatusHtml = extra.ticketStatusHtml;
+    }
     if (extra?.confidence != null) msg.confidence = extra.confidence;
     conv.messages.push(msg);
     conv.updatedAt = Date.now();
@@ -8038,9 +8078,9 @@ const ChatModule = {
         const payload = await TicketLookupModule.buildChatResponse(ticketIdEarly);
         ArturitoModule.onAnswerFound();
         const msgRef = this.addBotMessage(payload.text, payload.actions, {
-          confidence: 100,
           userQuery: text,
           intent: 'ticket_status',
+          ticketStatusHtml: payload.ticketStatusHtml,
           analytics: { intent: 'ticket_status', trackable: true, source: 'ticket_lookup' }
         });
         if (payload.liveWatch && msgRef) TicketLookupModule.startLiveWatch(ticketIdEarly, msgRef);
@@ -8062,9 +8102,9 @@ const ChatModule = {
         const payload = await TicketLookupModule.buildChatResponse(result.ticketId);
         ArturitoModule.onAnswerFound();
         const msgRef = this.addBotMessage(payload.text, payload.actions, {
-          confidence: 100,
           userQuery: text,
           intent: 'ticket_status',
+          ticketStatusHtml: payload.ticketStatusHtml,
           analytics: result.analytics
         });
         if (payload.liveWatch && msgRef) TicketLookupModule.startLiveWatch(result.ticketId, msgRef);
@@ -8141,6 +8181,21 @@ const ChatModule = {
 
 /* URL pública donde los residentes consultan tickets (botón en correo de confirmación) */
 const DEFAULT_PUBLIC_APP_URL = 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo';
+
+function isLegacyPublicAppUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return true;
+  return /kike01f\.github\.io\/bots\b/i.test(u)
+    || /chatbots-hipodromo\.(web\.app|firebaseapp\.com)/i.test(u);
+}
+
+function resolvePublicAppUrl(settings) {
+  const configured = String((settings || database?.settings || {}).publicAppUrl || '').trim();
+  if (!configured || isLegacyPublicAppUrl(configured)) return DEFAULT_PUBLIC_APP_URL;
+  return configured.replace(/\/admin\/?$/i, '').replace(/\/$/, '');
+}
+
+window.resolvePublicAppUrl = resolvePublicAppUrl;
 
 /* ─── TicketEmailDebug — diagnóstico en consola del envío de correos ─── */
 const TicketEmailDebug = {
@@ -8452,9 +8507,7 @@ const TicketEmailDebug = {
     return `${ticketId}-client`;
   },
   buildTicketStatusUrl(ticketId, settings) {
-    const s = settings || database.settings || {};
-    const raw = s.publicAppUrl || DEFAULT_PUBLIC_APP_URL;
-    const base = String(raw).replace(/\/admin\/?$/i, '').replace(/\/$/, '');
+    const base = resolvePublicAppUrl(settings || database.settings);
     return `${base}/?ticket=${encodeURIComponent(ticketId)}`;
   },
   buildClientConfirmationPayload(ticketId, ticket, settings) {
@@ -9074,6 +9127,101 @@ const TicketLookupModule = {
     }).join('\n\n');
   },
 
+  _renderAttachmentsHtml(atts) {
+    const list = (atts || []).filter(Boolean);
+    if (!list.length) return '';
+    return `<ul class="ticket-status-atts">${list.map((a) => {
+      const name = escapeHtml(a.name || 'documento');
+      const size = a.size ? ` <span class="ticket-att-size">(${escapeHtml(formatBytes(a.size))})</span>` : '';
+      return a.url
+        ? `<li><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" class="chat-external-link">📎 ${name}</a>${size}</li>`
+        : `<li>📎 ${name}${size}</li>`;
+    }).join('')}</ul>`;
+  },
+
+  formatStatusHtml(ticket, entries) {
+    const s = database.settings || {};
+    const primary = s.primaryColor || '#0d9488';
+    const building = s.buildingName || 'Edificio';
+    const esc = (v) => escapeHtml(String(v ?? ''));
+    const hint = this.estadoHint(ticket.estado);
+    const updated = ticket.ultimaRespuestaAt || ticket.updatedAt || ticket.createdAt;
+    const timeline = entries || [];
+    const estadoLabel = hint ? `${ticket.estado} — ${hint}` : (ticket.estado || '—');
+
+    const metaRows = [
+      ['Estado actual', estadoLabel],
+      ['Categoría', ticket.categoria || '—'],
+      ['Prioridad', ticket.prioridad || '—'],
+      ['Departamento', ticket.departamento || '—'],
+      ['Residente', ticket.nombre || '—'],
+      ['Creada', fmtDate(ticket.createdAt)],
+      ['Última actualización', fmtDate(updated)]
+    ];
+    const metaHtml = metaRows.map(([k, v]) =>
+      `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`
+    ).join('');
+
+    const initialAtts = (ticket.attachments || []).filter(Boolean);
+    const initialAttsBlock = initialAtts.length
+      ? `<div class="ticket-status-section">Documentos de tu solicitud</div>${this._renderAttachmentsHtml(initialAtts)}`
+      : '';
+
+    const timelineHtml = timeline.length
+      ? timeline.map((r, idx) => {
+        const who = esc(r.autorNombre || 'Administración');
+        const role = r.autorRol ? `<span class="ticket-entry-role"> (${esc(r.autorRol)})</span>` : '';
+        const statusLine = r.tipo === 'status_update' && r.estadoNuevo
+          ? `<div class="ticket-entry-status">Estado actualizado → <strong>${esc(r.estadoNuevo)}</strong></div>`
+          : '';
+        const msg = r.mensaje
+          ? `<div class="ticket-entry-msg">${esc(String(r.mensaje).trim())}</div>`
+          : '';
+        const attHtml = this._renderAttachmentsHtml(r.adjuntos);
+        return `<article class="ticket-status-entry">
+          <header class="ticket-entry-head"><span class="ticket-entry-num">Gestión ${idx + 1}</span> · ${esc(fmtDate(r.fecha))} · <strong>${who}</strong>${role}</header>
+          ${statusLine}${msg}${attHtml}
+        </article>`;
+      }).join('')
+      : '<p class="ticket-status-empty">Aún no hay gestiones del equipo. Te avisaremos aquí cuando haya novedades.</p>';
+
+    const descripcionBlock = ticket.descripcion
+      ? `<div class="ticket-status-section">Tu solicitud original</div>
+         <div class="ticket-status-desc">${esc(String(ticket.descripcion).trim())}</div>`
+      : '';
+
+    const closedNote = ['Resuelto', 'Cerrado'].includes(ticket.estado)
+      ? '<p class="ticket-status-foot">Si necesitas reabrir el caso, escribe «crear ticket» con el detalle.</p>'
+      : '';
+
+    return `<div class="ticket-status-card" style="--ticket-primary:${esc(primary)}">
+      <div class="ticket-status-header">
+        <strong>${esc(building)}</strong>
+        <span>Estado de tu solicitud</span>
+      </div>
+      <div class="ticket-status-body">
+        <div class="ticket-status-id-box">
+          <span class="ticket-status-id-label">Número de ticket</span>
+          <span class="ticket-status-id-value">${esc(ticket.id)}</span>
+        </div>
+        <table class="ticket-status-meta">${metaHtml}</table>
+        ${descripcionBlock}
+        ${initialAttsBlock}
+        <div class="ticket-status-section">Historial de gestiones (${timeline.length})</div>
+        <div class="ticket-status-timeline">${timelineHtml}</div>
+        <p class="ticket-status-foot">Se actualiza en tiempo real cuando administración responde o adjunta documentos.</p>
+        ${closedNote}
+      </div>
+    </div>`;
+  },
+
+  applyStatusToMessage(msg, ticket, responses, entries) {
+    if (!msg) return;
+    msg.text = this.formatStatusText(ticket, responses, entries);
+    msg.ticketStatus = true;
+    msg.ticketStatusHtml = this.formatStatusHtml(ticket, entries);
+  },
+
   formatStatusText(ticket, responses, entries) {
     const hint = this.estadoHint(ticket.estado);
     const timeline = entries || [];
@@ -9116,6 +9264,7 @@ const TicketLookupModule = {
     }
     return {
       text: this.formatStatusText(data.ticket, data.responses, data.entries),
+      ticketStatusHtml: this.formatStatusHtml(data.ticket, data.entries),
       actions: null,
       ticketId,
       liveWatch: true
@@ -9145,7 +9294,7 @@ const TicketLookupModule = {
       let responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
       ticket.attachments = await this.enrichAttachments(ticket.attachments || []);
       const entries = await this.buildFullTimeline(ticket, responses);
-      msg.text = this.formatStatusText(ticket, responses, entries);
+      this.applyStatusToMessage(msg, ticket, responses, entries);
       DatabaseModule.save();
       ChatModule.renderMessages('bot-start');
     });
@@ -9167,8 +9316,8 @@ const TicketLookupModule = {
       ChatModule.showTyping(false);
       const msgRef = ChatModule.addBotMessage(payload.text, payload.actions, {
         intent: 'ticket_status',
-        confidence: 100,
         userQuery: id,
+        ticketStatusHtml: payload.ticketStatusHtml,
         skipAnalytics: true
       });
       if (payload.liveWatch && msgRef) this.startLiveWatch(id, msgRef);
@@ -11169,7 +11318,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v16-admin-channels';",
+    "const CACHE_NAME='arturito-ai-v18-ticket-status-card';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
