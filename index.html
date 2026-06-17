@@ -242,6 +242,12 @@ body.mode-client #adminApp{display:none!important}
 .client-hint{font-size:.875rem;color:rgba(226,232,240,.92);padding:1rem 1.25rem;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-sm);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;transform:translateY(6px);animation:heroLineIn .22s cubic-bezier(.25,.9,.3,1) .16s forwards}
 @media(max-width:768px){.client-hero,.client-hint{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(15,23,42,.82)}.client-hero::after{animation:none;opacity:0}}
 .client-hint strong{color:#8FCB1A;font-weight:700}
+.client-ticket-lookup{margin-top:1rem;padding:.85rem 1rem;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(0,0,0,.22);text-align:left}
+.client-ticket-lookup label{display:block;font-size:.78rem;font-weight:700;color:rgba(241,245,249,.95);margin-bottom:.45rem}
+.client-ticket-lookup-row{display:flex;gap:.45rem;flex-wrap:wrap}
+.client-ticket-lookup-row input{flex:1;min-width:180px;padding:.55rem .65rem;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(15,23,42,.65);color:#fff;font-size:.9rem}
+.client-ticket-hint{margin:.45rem 0 0;font-size:.72rem;color:rgba(226,232,240,.85);line-height:1.35}
+.client-ticket-hint code{font-size:.68rem;background:rgba(255,255,255,.08);padding:.1rem .35rem;border-radius:4px}
 @keyframes heroCardReveal{to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes heroLogoPop{to{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes heroLineIn{to{opacity:1;transform:translateY(0)}}
@@ -806,6 +812,14 @@ body.mode-client #adminApp{display:none!important}
     <h1 id="clientBuildingName">Edificio Hipódromo</h1>
     <p class="client-tagline" id="clientTagline">Tu asistente virtual disponible 24/7</p>
     <p class="client-hint" id="clientHint">Consulta horarios, gastos comunes, reservas o crea solicitudes. Haz clic en <strong>Arturito</strong> en la esquina inferior derecha.</p>
+    <div class="client-ticket-lookup" id="clientTicketLookup">
+      <label for="clientTicketInput">Consultar estado de solicitud</label>
+      <div class="client-ticket-lookup-row">
+        <input type="text" id="clientTicketInput" placeholder="TK-20260617-0010" autocomplete="off" spellcheck="false">
+        <button type="button" id="btnClientTicketLookup" class="btn btn-primary btn-sm">Ver estado</button>
+      </div>
+      <p class="client-ticket-hint">Usa el número que recibiste al crear la solicitud. También puedes abrir <code>?ticket=TK-…</code> desde cualquier navegador.</p>
+    </div>
   </div>
   <footer class="client-footer">
     <button type="button" id="btnAdminAccess" class="client-admin-link">Acceso administración</button>
@@ -2766,7 +2780,10 @@ const ARTURITO_GADGET_KB_SEED = [
         createdAt: d.fechaCreacion || Date.now(),
         updatedAt: d.fechaActualizacion || Date.now(),
         asignadoA: d.asignadoA,
-        creadoPor: d.creadoPor
+        creadoPor: d.creadoPor,
+        ultimaRespuesta: d.ultimaRespuesta || '',
+        ultimaRespuestaAt: d.ultimaRespuestaAt || null,
+        historialResidente: Array.isArray(d.historialResidente) ? d.historialResidente : []
       };
     }
 
@@ -2963,36 +2980,139 @@ const ARTURITO_GADGET_KB_SEED = [
       return ref.id;
     }
 
-    async getById(ticketId) {
-      if (!this.fb.isEnabled() || !ticketId) return null;
-      const { getDoc, doc } = this.fb._modules;
-      const snap = await getDoc(doc(this.fb.col('tickets'), ticketId));
-      if (!snap.exists()) return null;
-      return this.mapToLocal(snap.data(), snap.id);
+    async getById(ticketId, { forceServer = true, condominioIds = null } = {}) {
+      if (!ticketId) return null;
+      const ids = condominioIds || [
+        this.fb.getCondominioId(),
+        'hipodromo',
+        'default'
+      ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+      if (this.fb.isEnabled()) {
+        const { getDoc, getDocFromServer, doc } = this.fb._modules;
+        for (const cid of ids) {
+          try {
+            const ref = doc(this.fb.db, `condominios/${cid}/tickets/${ticketId}`);
+            const snap = forceServer && getDocFromServer
+              ? await getDocFromServer(ref).catch(() => getDoc(ref))
+              : await getDoc(ref);
+            if (snap.exists()) return this.mapToLocal(snap.data(), snap.id);
+          } catch (err) {
+            console.warn('[Cloud] getById', cid, err);
+          }
+        }
+      }
+      return this.getByIdViaRest(ticketId, ids);
     }
 
-    async listResponses(ticketId) {
-      if (!this.fb.isEnabled() || !ticketId) return [];
-      const { getDocs, query, where, orderBy } = this.fb._modules;
+    async getByIdViaRest(ticketId, condominioIds = ['hipodromo', 'default']) {
+      const cfg = this.fb.getDefaultConfig?.() || {};
+      const project = cfg.projectId || 'chatbots-hipodromo';
+      const dbId = this.fb.getFirestoreDatabaseId?.() || 'artutitohipodromo02';
+      for (const cid of condominioIds) {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/${dbId}/documents/condominios/${cid}/tickets/${encodeURIComponent(ticketId)}`;
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (!data.fields) continue;
+          return this.mapToLocal(this._parseRestFields(data.fields), ticketId);
+        } catch (err) {
+          console.warn('[Cloud] getByIdViaRest', cid, err);
+        }
+      }
+      return null;
+    }
+
+    _parseRestFields(fields) {
+      const out = {};
+      Object.entries(fields || {}).forEach(([key, val]) => { out[key] = this._parseRestValue(val); });
+      return out;
+    }
+
+    _parseRestValue(val) {
+      if (!val || typeof val !== 'object') return val;
+      if ('stringValue' in val) return val.stringValue;
+      if ('integerValue' in val) return parseInt(val.integerValue, 10);
+      if ('doubleValue' in val) return val.doubleValue;
+      if ('booleanValue' in val) return val.booleanValue;
+      if ('timestampValue' in val) return new Date(val.timestampValue).getTime();
+      if ('nullValue' in val) return null;
+      if (val.arrayValue?.values) return val.arrayValue.values.map((v) => this._parseRestValue(v));
+      if (val.mapValue?.fields) return this._parseRestFields(val.mapValue.fields);
+      return null;
+    }
+
+    async listResponses(ticketId, { forceServer = true, condominioId = null } = {}) {
+      if (!ticketId) return [];
+      const cid = condominioId || this.fb.getCondominioId() || 'hipodromo';
+
+      if (this.fb.isEnabled()) {
+        const { getDocs, getDocsFromServer, query, where, collection } = this.fb._modules;
+        try {
+          const colRef = collection(this.fb.db, `condominios/${cid}/ticket_responses`);
+          const q = query(colRef, where('ticketId', '==', ticketId));
+          const snap = forceServer && getDocsFromServer
+            ? await getDocsFromServer(q).catch(() => getDocs(q))
+            : await getDocs(q);
+          return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
+        } catch (err) {
+          console.warn('[Cloud] listResponses SDK:', err);
+        }
+      }
+      return this.listResponsesViaRest(ticketId, cid);
+    }
+
+    async listResponsesViaRest(ticketId, condominioId = 'hipodromo') {
+      const cfg = this.fb.getDefaultConfig?.() || {};
+      const project = cfg.projectId || 'chatbots-hipodromo';
+      const dbId = this.fb.getFirestoreDatabaseId?.() || 'artutitohipodromo02';
       try {
-        const q = query(
-          this.fb.col('ticket_responses'),
-          where('ticketId', '==', ticketId),
-          orderBy('fecha', 'asc')
-        );
-        const snap = await getDocs(q);
-        return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/${dbId}/documents/condominios/${condominioId}:runQuery`;
+        const res = await fetch(url, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            structuredQuery: {
+              from: [{ collectionId: 'ticket_responses' }],
+              where: {
+                fieldFilter: {
+                  field: { fieldPath: 'ticketId' },
+                  op: 'EQUAL',
+                  value: { stringValue: ticketId }
+                }
+              },
+              limit: 50
+            }
+          })
+        });
+        const rows = await res.json();
+        if (!Array.isArray(rows)) return [];
+        return rows.filter((r) => r.document).map((r) => {
+          const id = r.document.name.split('/').pop();
+          return { id, ...this._parseRestFields(r.document.fields || {}) };
+        }).sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
       } catch (err) {
-        console.warn('[Cloud] listResponses:', err);
-        const q2 = query(this.fb.col('ticket_responses'), where('ticketId', '==', ticketId));
-        const snap2 = await getDocs(q2);
-        return snap2.docs.map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
+        console.warn('[Cloud] listResponsesViaRest:', err);
+        return [];
       }
     }
 
+    watchTicket(ticketId, callback, condominioId = null) {
+      if (!this.fb.isEnabled() || !ticketId) return () => {};
+      const cid = condominioId || this.fb.getCondominioId() || 'hipodromo';
+      const { doc } = this.fb._modules;
+      return this.fb.onSnapshot(
+        doc(this.fb.db, `condominios/${cid}/tickets/${ticketId}`),
+        (snap) => { if (snap.exists()) callback(this.mapToLocal(snap.data(), snap.id)); },
+        (err) => console.warn('[Cloud] watchTicket:', err)
+      );
+    }
+
     async addStaffResponse(ticketId, { mensaje, estado, files = [], autor }) {
-      const { updateDoc, doc } = this.fb._modules;
+      const { updateDoc, doc, arrayUnion } = this.fb._modules;
       const ticket = await this.getById(ticketId);
       if (!ticket) throw new Error('Ticket no encontrado');
 
@@ -3009,6 +3129,16 @@ const ARTURITO_GADGET_KB_SEED = [
       }
 
       const estadoCambio = estado && estado !== ticket.estado;
+      const histEntry = {
+        fecha: Date.now(),
+        mensaje,
+        autorNombre: autor?.nombre || 'Administración',
+        autorRol: autor?.rol || '',
+        tipo: estadoCambio ? 'status_update' : 'comment',
+        estadoNuevo: estadoCambio ? estado : null,
+        adjuntos: adjuntos.map((a) => ({ name: a.name, url: a.url, mimeType: a.mimeType }))
+      };
+
       await this.addResponse(ticketId, {
         usuarioId: autor?.id || autor?.email || 'staff',
         mensaje,
@@ -3028,11 +3158,14 @@ const ARTURITO_GADGET_KB_SEED = [
       if (adjuntos.length) {
         patch.adjuntos = [...(ticket.attachments || []), ...adjuntos];
       }
-      await updateDoc(doc(this.fb.col('tickets'), ticketId), {
+      const ticketRef = doc(this.fb.col('tickets'), ticketId);
+      const prevHist = ticket.historialResidente || [];
+      await updateDoc(ticketRef, {
         ...(estadoCambio ? { estado } : {}),
         fechaActualizacion: Date.now(),
         ultimaRespuesta: mensaje,
         ultimaRespuestaAt: Date.now(),
+        historialResidente: arrayUnion ? arrayUnion(histEntry) : [...prevHist, histEntry],
         ...(adjuntos.length ? { adjuntos: [...(ticket.attachments || []).map((a) => this.normalizeAttachment(a)).filter(Boolean), ...adjuntos] } : {})
       });
 
@@ -7879,15 +8012,20 @@ const ChatModule = {
       try {
         const payload = await TicketLookupModule.buildChatResponse(ticketIdEarly);
         ArturitoModule.onAnswerFound();
-        this.addBotMessage(payload.text, payload.actions, {
+        const msgRef = this.addBotMessage(payload.text, payload.actions, {
           confidence: 100,
           userQuery: text,
           intent: 'ticket_status',
           analytics: { intent: 'ticket_status', trackable: true, source: 'ticket_lookup' }
         });
+        if (payload.liveWatch && msgRef) TicketLookupModule.startLiveWatch(ticketIdEarly, msgRef);
         return;
       } catch (err) {
         console.warn('[TicketLookup]', err);
+        this.addBotMessage('No pudimos consultar **' + ticketIdEarly + '**. Revisa el número o tu conexión a internet.', [
+          { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }
+        ]);
+        return;
       }
     }
 
@@ -7898,12 +8036,13 @@ const ChatModule = {
       try {
         const payload = await TicketLookupModule.buildChatResponse(result.ticketId);
         ArturitoModule.onAnswerFound();
-        this.addBotMessage(payload.text, payload.actions, {
+        const msgRef = this.addBotMessage(payload.text, payload.actions, {
           confidence: 100,
           userQuery: text,
           intent: 'ticket_status',
           analytics: result.analytics
         });
+        if (payload.liveWatch && msgRef) TicketLookupModule.startLiveWatch(result.ticketId, msgRef);
         return;
       } catch (err) {
         console.warn('[TicketLookup]', err);
@@ -8557,13 +8696,29 @@ const TicketAttachmentModule = {
   }
 };
 
-/* ─── TicketLookupModule — consulta de estado en chat ─── */
+/* ─── TicketLookupModule — consulta de estado en chat (tiempo real, cualquier navegador) ─── */
 const TicketLookupModule = {
   TICKET_ID_RE: /TK-\d{8}-\d{4}/i,
+  _watchUnsubs: {},
+  _liveMsgIds: {},
 
   extractTicketId(text) {
     const m = String(text || '').match(this.TICKET_ID_RE);
     return m ? m[0].toUpperCase() : null;
+  },
+
+  parseUrlTicketId() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('ticket') || params.get('tk') || params.get('solicitud');
+      if (q) return this.extractTicketId(q) || (this.TICKET_ID_RE.test(q) ? q.toUpperCase() : null);
+      const path = window.location.pathname || '';
+      const pm = path.match(/\/(?:estado|ticket)\/(TK-\d{8}-\d{4})/i);
+      if (pm) return pm[1].toUpperCase();
+      const hash = (window.location.hash || '').replace(/^#\/?/, '');
+      const hm = hash.match(/(?:ticket|tk|solicitud)[=/:](TK-\d{8}-\d{4})/i) || hash.match(this.TICKET_ID_RE);
+      return hm ? hm[1].toUpperCase() : null;
+    } catch (_) { return null; }
   },
 
   estadoHint(estado) {
@@ -8572,26 +8727,53 @@ const TicketLookupModule = {
       'En Revisión': 'El equipo está evaluando tu caso.',
       'Asignado': 'Ya fue asignada a un responsable.',
       'En Proceso': 'Está siendo gestionada activamente.',
-      'Resuelto': 'Fue resuelta. Si necesitas algo más, puedes responder en el chat.',
+      'Resuelto': 'Fue resuelta. Si necesitas algo más, puedes crear una nueva solicitud.',
       'Cerrado': 'El caso está cerrado.'
     };
     return map[estado] || '';
   },
 
   async fetch(ticketId) {
-    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
-      throw new Error('Sin conexión a Firebase');
+    if (!ticketId) return null;
+    let ticket = null;
+    let responses = [];
+
+    if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.tickets?.getById) {
+      ticket = await ArturitoCloud.tickets.getById(ticketId, { forceServer: true });
+      if (ticket && !(ticket.historialResidente || []).length) {
+        responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
+      }
     }
-    const ticket = await ArturitoCloud.tickets.getById(ticketId);
+
+    if (!ticket && typeof ArturitoCloud !== 'undefined' && ArturitoCloud.tickets?.getByIdViaRest) {
+      ticket = await ArturitoCloud.tickets.getByIdViaRest(ticketId);
+      if (ticket) {
+        responses = await ArturitoCloud.tickets.listResponsesViaRest(ticketId);
+      }
+    }
+
     if (!ticket) return null;
-    const responses = (await ArturitoCloud.tickets.listResponses(ticketId))
-      .filter((r) => r.visibleToResidente !== false);
     return { ticket, responses };
   },
 
-  formatTimeline(responses) {
-    if (!responses?.length) return '_Aún no hay comentarios del equipo._';
-    return responses.slice(-5).map((r) => {
+  timelineEntries(ticket, responses) {
+    const hist = (ticket.historialResidente || []).filter((h) => h && h.mensaje);
+    if (hist.length) {
+      return hist.map((h) => ({
+        fecha: h.fecha,
+        mensaje: h.mensaje,
+        autorNombre: h.autorNombre,
+        tipo: h.tipo,
+        estadoNuevo: h.estadoNuevo,
+        adjuntos: h.adjuntos || []
+      }));
+    }
+    return (responses || []).filter((r) => r.visibleToResidente !== false);
+  },
+
+  formatTimeline(entries) {
+    if (!entries?.length) return '_Aún no hay comentarios del equipo. Te avisaremos aquí cuando haya novedades._';
+    return entries.slice(-8).map((r) => {
       const who = r.autorNombre ? `**${r.autorNombre}**` : '**Administración**';
       const when = fmtDate(r.fecha);
       let line = `• ${when} — ${who}`;
@@ -8599,10 +8781,48 @@ const TicketLookupModule = {
       line += `\n  ${String(r.mensaje || '').trim()}`;
       const atts = (r.adjuntos || []).filter(Boolean);
       if (atts.length) {
-        line += '\n  📎 ' + atts.map((a) => a.name || 'adjunto').join(', ');
+        const links = atts.map((a) => {
+          const name = a.name || 'documento';
+          return a.url ? `[${name}](${a.url})` : name;
+        });
+        line += '\n  📎 ' + links.join(', ');
       }
       return line;
     }).join('\n\n');
+  },
+
+  formatStatusText(ticket, responses) {
+    const hint = this.estadoHint(ticket.estado);
+    const attCount = (ticket.attachments || []).length;
+    const entries = this.timelineEntries(ticket, responses);
+    const updated = ticket.ultimaRespuestaAt || ticket.updatedAt || ticket.createdAt;
+
+    let text = [
+      `**Solicitud ${ticket.id}**`,
+      '',
+      `**Estado actual:** ${ticket.estado}${hint ? ' — ' + hint : ''}`,
+      `**Categoría:** ${ticket.categoria}`,
+      `**Prioridad:** ${ticket.prioridad}`,
+      `**Departamento:** ${ticket.departamento || '—'}`,
+      `**Creada:** ${fmtDate(ticket.createdAt)}`,
+      `**Última actualización:** ${fmtDate(updated)}`,
+      attCount ? `**Adjuntos iniciales:** ${attCount} archivo(s)` : ''
+    ].filter(Boolean).join('\n');
+
+    if (ticket.descripcion) {
+      text += `\n\n**Descripción:**\n${String(ticket.descripcion).trim()}`;
+    }
+    if (ticket.ultimaRespuesta) {
+      text += `\n\n**Último mensaje del equipo:**\n${String(ticket.ultimaRespuesta).trim()}`;
+    }
+
+    text += `\n\n**Historial de seguimiento:**\n${this.formatTimeline(entries)}`;
+    text += '\n\n_🔄 Esta información se actualiza en tiempo real. Vuelve a escribir el número de ticket para refrescar._';
+
+    if (['Resuelto', 'Cerrado'].includes(ticket.estado)) {
+      text += '\n\nSi necesitas reabrir el caso, escribe "crear ticket" con el detalle.';
+    }
+    return text;
   },
 
   async buildChatResponse(ticketId) {
@@ -8613,34 +8833,77 @@ const TicketLookupModule = {
         actions: [{ label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }]
       };
     }
-    const { ticket, responses } = data;
-    const hint = this.estadoHint(ticket.estado);
-    const attCount = (ticket.attachments || []).length;
-    let text = [
-      `**Solicitud ${ticket.id}**`,
-      '',
-      `**Estado:** ${ticket.estado}${hint ? ' — ' + hint : ''}`,
-      `**Categoría:** ${ticket.categoria}`,
-      `**Prioridad:** ${ticket.prioridad}`,
-      `**Departamento:** ${ticket.departamento || '—'}`,
-      `**Creada:** ${fmtDate(ticket.createdAt)}`,
-      attCount ? `**Adjuntos iniciales:** ${attCount} archivo(s)` : ''
-    ].filter(Boolean).join('\n');
+    return {
+      text: this.formatStatusText(data.ticket, data.responses),
+      actions: null,
+      ticketId,
+      liveWatch: true
+    };
+  },
 
-    if (ticket.descripcion) {
-      text += `\n\n**Descripción:**\n${String(ticket.descripcion).trim()}`;
+  stopWatch(ticketId) {
+    if (this._watchUnsubs[ticketId]) {
+      try { this._watchUnsubs[ticketId](); } catch (_) {}
+      delete this._watchUnsubs[ticketId];
     }
+    delete this._liveMsgIds[ticketId];
+  },
 
-    const timeline = this.formatTimeline(responses);
-    text += `\n\n**Últimas actualizaciones:**\n${timeline}`;
+  startLiveWatch(ticketId, msgRef) {
+    if (!ticketId || !msgRef) return;
+    const msgId = typeof msgRef === 'object' ? msgRef.id : msgRef;
+    if (!msgId) return;
+    this.stopWatch(ticketId);
+    this._liveMsgIds[ticketId] = msgId;
+    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.tickets?.watchTicket) return;
 
-    if (['Resuelto', 'Cerrado'].includes(ticket.estado)) {
-      text += '\n\nSi necesitas reabrir el caso, escribe "crear ticket" con el detalle.';
-    } else {
-      text += '\n\nTe avisaremos por correo cuando haya novedades. Puedes volver a consultar con el mismo número.';
+    this._watchUnsubs[ticketId] = ArturitoCloud.tickets.watchTicket(ticketId, async (ticket) => {
+      const conv = ChatModule.getCurrent();
+      const msg = conv?.messages?.find((m) => m.id === msgId);
+      if (!msg || !ticket) return;
+      let responses = [];
+      if (!(ticket.historialResidente || []).length) {
+        responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
+      }
+      msg.text = this.formatStatusText(ticket, responses);
+      DatabaseModule.save();
+      ChatModule.renderMessages('bot-start');
+    });
+  },
+
+  async consultFromPortal(ticketId) {
+    const id = this.extractTicketId(ticketId) || String(ticketId || '').trim().toUpperCase();
+    if (!id || !this.TICKET_ID_RE.test(id)) {
+      toast('Ingresa un número válido (ej. TK-20260617-0010)', 'warning');
+      return;
     }
+    if (typeof GadgetModule !== 'undefined') GadgetModule.toggle(true);
+    if (typeof ChatModule === 'undefined') return;
+    if (!ChatModule.getCurrent()) ChatModule.startNewConversation({ openChat: false });
+    ChatModule.addUserMessage(id);
+    ChatModule.showTyping(true);
+    try {
+      const payload = await this.buildChatResponse(id);
+      ChatModule.showTyping(false);
+      const msgRef = ChatModule.addBotMessage(payload.text, payload.actions, {
+        intent: 'ticket_status',
+        confidence: 100,
+        userQuery: id,
+        skipAnalytics: true
+      });
+      if (payload.liveWatch && msgRef) this.startLiveWatch(id, msgRef);
+      ArturitoModule.onAnswerFound();
+    } catch (err) {
+      ChatModule.showTyping(false);
+      ChatModule.addBotMessage('No pudimos consultar el ticket. Verifica tu conexión e intenta de nuevo.');
+      console.warn('[TicketLookup]', err);
+    }
+  },
 
-    return { text, actions: null };
+  async handleDeepLink() {
+    const ticketId = this.parseUrlTicketId();
+    if (!ticketId) return;
+    setTimeout(() => { void this.consultFromPortal(ticketId); }, 800);
   }
 };
 
@@ -10559,7 +10822,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v12-tickets';",
+    "const CACHE_NAME='arturito-ai-v13-tickets-live';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
@@ -10713,6 +10976,9 @@ const App = {
       await RAGModule.rebuildIndex();
       this.showCloudSyncLoading(false);
       void TicketEmailDebug.audit('Al cargar la app');
+    } else if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.()) {
+      this.showCloudSyncLoading(false);
+      toast('Modo consulta de tickets activo. Algunas funciones admin pueden estar limitadas.', 'warning');
     } else {
       this.showCloudSyncLoading(true, 'Conexión a la nube requerida',
         'Todos los datos están en Firestore (artutitohipodromo02). Ejecuta bash deploy.sh, verifica internet y recarga.');
@@ -10744,6 +11010,18 @@ const App = {
 
     if (AuthModule.checkSession()) this.setMode('admin');
     else this.setMode('client');
+
+    document.getElementById('btnClientTicketLookup')?.addEventListener('click', () => {
+      const v = document.getElementById('clientTicketInput')?.value;
+      void TicketLookupModule.consultFromPortal(v);
+    });
+    document.getElementById('clientTicketInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void TicketLookupModule.consultFromPortal(e.target.value);
+      }
+    });
+    void TicketLookupModule.handleDeepLink();
 
 registerArturitoServiceWorker();
 
