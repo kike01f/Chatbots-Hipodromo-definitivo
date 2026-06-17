@@ -8115,7 +8115,12 @@ const TicketEmailDebug = {
         return { ok: false, error: err.message };
       }
     }
-    this.warn('Sin delivery — despliega Functions (bash deploy.sh)', { mailId, path: `mail/${mailId}`, database: dbId });
+    this.warn('Sin delivery — Cloud Functions NO desplegadas en Firebase', {
+      mailId,
+      path: `mail/${mailId}`,
+      database: dbId,
+      solucion: 'Terminal: cd "Chatbots Hipodromo" && firebase login && bash deploy.sh'
+    });
     if (notifyUser) {
       toast('El correo está pendiente. Ejecuta bash deploy.sh para activar el envío.', 'warning');
     }
