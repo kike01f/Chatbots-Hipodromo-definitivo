@@ -1,38 +1,12 @@
-{
-  "indexes": [
-    {
-      "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "estado", "order": "ASCENDING" },
-        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "notifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "usuarioDestino", "order": "ASCENDING" },
-        { "fieldPath": "leida", "order": "ASCENDING" },
-        { "fieldPath": "fecha", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "origen", "order": "ASCENDING" },
-        { "fieldPath": "fechaCreacion", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "entries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "ticketId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    }
-  ],
-  "fieldOverrides": []
-}
+	
+type	"service_account"
+project_id	"chatbots-hipodromo"
+private_key_id	"d41b9b8cc38c29fe6d908574f394513fd73e83b0"
+private_key	"-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCdujkqEpld+D8l\natVQZqJefQR8R/RPKyD63BLMtl2uLRNVJHc1h059Tb0xSEZ1kqRAuXm4UuZ9p1Rr\nmaaJuw8kGqnUdIDm7CXb5ckjxY5/02SjoN3NuGKS/Rt/yRM64VwHiYefEPLxENNg\nafjo7kpz23jGbyZrZV9yXEBrcWEwe1yquCroP4IH4n7cNTHN0atZ86x10PclvvET\nMCA4DGtqP6DJIQy6rIacjxpFV8CquCCibCbq6Z010aZw/2gZTdMDYK8WoWkQW3IX\nkcBrv2ldJ8G2BHOY3xW6qtK0v+UZKrNwaxN96Q7pnv1blHx0+S6V45ByHE7oOQ5i\nIA8SLj65AgMBAAECggEAOsumb4aLYToe3+XZKqV3tV1JBMMV0UU0gA71exYoCbuH\nz19OiMetfIw0EGDu0vkc/XumYg2VGhX8JDgcmo7+b+j4kdf0DSDOZBBeUFVeb0vv\n4gcfZ4ZqSHzNeW8NGg/T7INZ6PO6fB5XjUMzpDDf1BxmAyJ/4dziHZFB+ktDfXyJ\nFtXAvf12zCXRVACijppXPTNk0XO4ZlhlE59jtexy18HBXNM7Lws+w7Tt7UpZlCnZ\nHxKSHbqzQPSoKQE/LY7qFAe71LLMWNW3f/PjV75oCYYowwXketCTjTcAdlnDi9xt\nI4wqF35w+8gonKYb35SmLTGgpBpVeFftDALKpkmX+QKBgQDK8YdiXwltLoYgTS5v\nCRVFOGJXERm+VpdMNSnit6euy2K/2TgmYb4YQKJko93cErR36NYIDYyA74W//CIB\neGxxxMVddD06W1xFn2iTCSOvHb5wry5C67iEhX9twUDepQu+56mKAHTQQFwjuAuG\nRikR9B97BY7/ZrA9X8oi49bDCwKBgQDG9oEegfqILyKCoQeSgrWW3Oc39bJHBJbK\nG/Ms87kKyohda643vqf+ac1MKyqO9GcHFqR217JQkWkKdzKHm45eosmC7DLAvr3S\n22xwOT17gCtHP3qWsRRklzRYwq7aIbcJKDCIl6qwL/yzPE9ijyEzRJxD+WY/6ADu\npOhDpdHfywKBgC8xS1JM11xUXUxVpl6bth6KphOpHltst3I5Sqw2GQBEu4nxcWU7\nhYEORrUwhf8POnhH5L2qqOmyyV+DukStREqQf3Tj+vj/Fc36686FaY7nU8nQcumM\n9zOZ97AGKJeducWDCaHVyVREIykLO2LWHebW5hsth7tMnd8nz1GduetRAoGBALcp\nPvyC08yC99YhwALUaa8UdZdCjHhsdRRiXp9HT1Xr1VWLR7rxvV2ssN4p7ufjfuU7\npvPw5ard8kE8Mjw8q/fbDH+GScK+1alDbrRxPXRwLWdNvOD0670epYYA007kMsgv\nQ167oNrJkmy+XKZy9TFpPCInekXiotkO3vNHt8m5AoGBAJqEfnRV+DxdYiITT/BS\ncLlWUgKfR7Xzm0uVXd8QpjtVte2Wg/VvEGkBy0F2iEv8TzrHStGqJlnIw+8N56da\nXCu3GQMBna2At/hmUgZer4809v2rWhaj3Jsosj6UifzVp95sTcoaQUKPSi7W6hiR\nANwOEgaXSSe7To7h3+9SgAUZ\n-----END PRIVATE KEY-----\n"
+client_email	"arturito-deploy@chatbots-hipodromo.iam.gserviceaccount.com"
+client_id	"114167310932425110825"
+auth_uri	"https://accounts.google.com/o/oauth2/auth"
+token_uri	"https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url	"https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url	"https://www.googleapis.com/robot/v1/metadata/x509/arturito-deploy%40chatbots-hipodromo.iam.gserviceaccount.com"
+universe_domain	"googleapis.com"
