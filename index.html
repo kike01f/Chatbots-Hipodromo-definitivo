@@ -10559,10 +10559,10 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v10';",
+    "const CACHE_NAME='arturito-ai-v12-tickets';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
-    "var OFFLINE=[SCOPE,new URL('index.html',SCOPE).href,",
+    "var OFFLINE=[",
     "'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap',",
     "'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'];",
     "e.waitUntil(caches.open(CACHE_NAME).then(function(c){return c.addAll(OFFLINE.filter(Boolean));}).catch(function(){}));",
@@ -10575,8 +10575,11 @@ function registerArturitoServiceWorker() {
     "var u=new URL(e.request.url);",
     "if(u.origin.indexOf('googleapis.com')>-1||u.origin.indexOf('gstatic.com')>-1||u.origin.indexOf('cdnjs.cloudflare.com')>-1){",
     "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));return;}",
-    "var fb=new URL('index.html',self.registration.scope).href;",
-    "e.respondWith(caches.match(e.request).then(function(c){return c||fetch(e.request).catch(function(){return caches.match(fb);});}));",
+    "var scope=self.registration.scope;",
+    "var isAppShell=e.request.mode==='navigate'||/index\\.html$/i.test(u.pathname)||u.pathname===scope.replace(/\\/$/,'')||u.pathname===scope;",
+    "if(isAppShell){",
+    "e.respondWith(fetch(e.request).then(function(r){if(!r||r.status!==200)return r;return caches.open(CACHE_NAME).then(function(c){c.put(e.request,r.clone());return r;});}).catch(function(){return caches.match(e.request);}));return;}",
+    "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));",
     "});"
   ].join('');
   var blob = new Blob([swCode], { type: 'application/javascript' });
