@@ -6866,13 +6866,6 @@ const QueryUnderstandingModule = {
     return expanded.filter((t) => t.length > 2 && !RAGModule.STOP.has(t) && !this.QUESTION_WORDS.has(t));
   },
 
-  queryVariants(text) {
-    const raw = String(text || '').trim();
-    const stripped = this.stripFillers(raw);
-    const core = this.coreTokens(raw).join(' ');
-    return [...new Set([raw, stripped, core].filter((q) => q && q.length > 2))];
-  },
-
   levenshtein(a, b) {
     const m = a.length, n = b.length;
     if (!m) return n;
@@ -6946,6 +6939,15 @@ const QueryUnderstandingModule = {
     else if (titleOverlap >= 0.72) score = Math.max(score, 0.82);
     else if (titleOverlap >= 0.55 && kwResult.matches >= 1) score = Math.max(score, 0.68);
 
+    if (questionField) {
+      const qfNorm = this.normalize(questionField);
+      if (qfNorm.length > 6 && (qNorm.includes(qfNorm) || qfNorm.includes(qNorm))) {
+        score = Math.max(score, 0.78);
+      } else if (questionOverlap >= 0.45) {
+        score = Math.max(score, 0.72);
+      }
+    }
+
     const qEmbed = RAGModule.hashEmbed(qTokens);
     const entryTokens = RAGModule.tokenize(`${title} ${questionField} ${keywords.join(' ')}`);
     const semantic = RAGModule.cosineSim(qEmbed, RAGModule.hashEmbed(entryTokens));
@@ -6996,6 +6998,61 @@ const QueryUnderstandingModule = {
       if (s > bestScore) { bestScore = s; bestDomain = domain; }
     });
     return bestScore >= 2 ? bestDomain : null;
+  },
+
+  /** Pregunta informativa del reglamento/servicios (no ticket ni reclamo) */
+  isInformationalQuery(text) {
+    const raw = String(text || '').trim();
+    const norm = this.normalize(raw);
+    if (/[?¿]/.test(raw)) return true;
+    if (/^(que|qué|como|cómo|donde|dónde|cuando|cuándo|cual|cuál|cuales|cuáles|cuanto|cuánto|cuanta|cuánta|hay|se puede|puedo|me permiten|a que hora|a qué hora|horario|horarios|donde queda|dónde queda|como funciona|cómo funciona|que debo|qué debo|informacion|información|consulta)\b/.test(norm)) {
+      return true;
+    }
+    return /\b(cuanto cuesta|cuánto cuesta|cuanto vale|cuánto vale|me pueden|esta permitido|está permitido|se puede)\b/.test(norm);
+  },
+
+  /** Consulta explícita de estado de ticket/solicitud del residente */
+  isTicketStatusQuery(text) {
+    const raw = String(text || '').trim();
+    if (typeof TicketLookupModule !== 'undefined' && TicketLookupModule.extractTicketId(raw)) return true;
+    const norm = this.normalize(raw);
+    if (/\btk[\s-]*\d{6,8}[\s-]*\d{3,4}\b/.test(norm.replace(/\s/g, ''))) return true;
+    return /\b(consultar estado|ver estado|estado de mi|estado del ticket|estado de la solicitud|estado de mi solicitud|seguimiento de mi|seguimiento del ticket|numero de ticket|número de ticket|mi numero tk|mi número tk|como va mi solicitud|cómo va mi solicitud|como va mi ticket|cómo va mi ticket|donde va mi solicitud|dónde va mi solicitud)\b/.test(norm);
+  },
+
+  /** Requerimiento, reclamo o problema que debe convertirse en solicitud */
+  isRequirementQuery(text) {
+    const norm = this.normalize(text);
+    if (this.isTicketStatusQuery(text)) return false;
+    if (/\b(crear ticket|nuevo ticket|abrir solicitud|reportar problema|hacer reclamo|presentar reclamo|generar solicitud|solicitud nueva)\b/.test(norm)) {
+      return true;
+    }
+    const requirementSignals = /\b(reclamo|reclamar|reportar|problema|no funciona|dejo de funcionar|dejó de funcionar|esta roto|está roto|roto|filtracion|filtración|fuga|goteo|ruido|ruidos|molest|ascensor|porton|portón|porton roto|portón roto|estacionamiento|averia|avería|daño|dano|urgente|inund|humo|olor|filtra|gotea|atascad|bloquead|sin luz|sin agua|perdida|pérdida|fuga de|rotura)\b/;
+    const actionSignals = /\b(necesito|quisiera|quiero|solicito|requiero|pedir|reportar|avisar|informar)\b.*\b(repar|arregl|solucion|solución|visita|tecnico|técnico|conserje|mayordomo|revisen|revisar|atender|gestionar)\b/;
+    const personalContext = /\b(depto|departamento|mi casa|mi depto|mi departamento|en mi|mi unidad|mi estacionamiento|mi bodega|piso \d|torre \w)\b/.test(norm)
+      || norm.length >= 40;
+    if (requirementSignals.test(norm) && personalContext) return true;
+    if (actionSignals.test(norm)) return true;
+    if (/\b(tengo|hay)\b.*\b(problema|filtracion|filtración|fuga|ruido|averia|avería)\b/.test(norm)) return true;
+    return false;
+  },
+
+  /** Núcleo temático de la pregunta (para búsqueda más precisa) */
+  extractQuestionFocus(text) {
+    let t = this.stripFillers(text);
+    t = t.replace(/^(que|qué|como|cómo|donde|dónde|cuando|cuándo|cual|cuál|cuanto|cuánto|hay|se puede|puedo|me permiten|informacion sobre|información sobre|consulta sobre|pregunta sobre)\s+/i, '');
+    t = t.replace(/[?¿!¡.]+$/g, '').trim();
+    return t.length > 2 ? t : this.stripFillers(text);
+  },
+
+  queryVariants(text) {
+    const raw = String(text || '').trim();
+    const stripped = this.stripFillers(raw);
+    const focus = this.extractQuestionFocus(raw);
+    const core = this.coreTokens(raw).join(' ');
+    const domain = this.detectDomain(raw);
+    const domainCore = domain ? `${domain} ${core}`.trim() : '';
+    return [...new Set([raw, stripped, focus, core, domainCore].filter((q) => q && q.length > 2))];
   }
 };
 
@@ -7005,12 +7062,12 @@ const ResponseEngine = {
 
   /** Umbrales de precisión — preferir no responder antes que inventar */
   THRESHOLDS: {
-    ANSWER: 0.48,
-    CONFIDENT: 0.60,
-    SUGGEST: 0.14,
-    SUGGEST_AFFINITY: 0.24,
-    MARGIN: 0.09,
-    RAG_DOC: 0.10
+    ANSWER: 0.50,
+    CONFIDENT: 0.62,
+    SUGGEST: 0.16,
+    SUGGEST_AFFINITY: 0.26,
+    MARGIN: 0.08,
+    RAG_DOC: 0.12
   },
 
   /** Consulta con contenido real (no saludo vacío) */
@@ -7090,16 +7147,36 @@ const ResponseEngine = {
   /** Detecta intención del mensaje */
   analyzeIntent(text, conv) {
     const t = String(text || '').trim().toLowerCase();
+    const Q = QueryUnderstandingModule;
+
     if (/^(hola|buenas|buenos|hey|hi|saludos|que tal|qué tal)\b/.test(t)) return 'greeting';
     if (/(muchas gracias|mil gracias|te lo agradezco|gracias arturito|^gracias\b)/.test(t)) return 'thanks';
     if (/(chao|adiós|adios|hasta luego|nos vemos|me voy)/.test(t)) return 'goodbye';
     if (/^(si|sí|ok|dale|perfecto|entendido|claro|bueno)$/.test(t)) return 'affirmative';
-    if (/humano|persona|agente|operador|hablar con/.test(t)) return 'escalate';
-    if (/estado|solicitud|ticket|seguimiento/.test(t)) return 'ticket_status';
-    if (/crear ticket|nuevo ticket|reportar|solicitud nueva/.test(t)) return 'ticket_create';
+    if (/humano|persona|agente|operador|hablar con|conserje|mayordomo/.test(t) && !Q.isInformationalQuery(text)) return 'escalate';
+
+    if (Q.isTicketStatusQuery(text)) return 'ticket_status';
+    if (Q.isRequirementQuery(text)) return 'ticket_create';
+
     const users = (conv?.messages || []).filter(m => m.type === 'user');
     if (users.length > 1 && (t.length < 40 || this.FOLLOW_UP.test(t))) return 'follow_up';
     return 'question';
+  },
+
+  /** Mensaje contextual al detectar un requerimiento/reclamo */
+  buildRequirementHint(text) {
+    const norm = QueryUnderstandingModule.normalize(text);
+    let tema = '';
+    if (/ruido|molest/.test(norm)) tema = 'ruidos y convivencia';
+    else if (/ascensor|elevador/.test(norm)) tema = 'ascensor';
+    else if (/filtr|fuga|gote|agua|inund/.test(norm)) tema = 'filtraciones o agua';
+    else if (/porton|portón|acceso|llave|tarjeta/.test(norm)) tema = 'accesos';
+    else if (/estacionamiento|bodega/.test(norm)) tema = 'estacionamiento o bodega';
+    else if (/luz|electric|apaga|sin luz/.test(norm)) tema = 'electricidad';
+    const intro = tema
+      ? `Entiendo que tienes un **requerimiento** relacionado con **${tema}**.`
+      : 'Entiendo que necesitas **reportar un requerimiento** al edificio.';
+    return `${intro}\n\nPuedo ayudarte a **crear una solicitud formal** para que administración la registre, dé seguimiento y te responda por chat o correo.`;
   },
 
   /** Enriquece consulta solo en seguimientos claros (evita mezclar preguntas distintas) */
@@ -7122,8 +7199,11 @@ const ResponseEngine = {
   /** Valida que el match sea coherente con la pregunta antes de responder */
   validateMatch(query, match) {
     if (!match) return false;
+    const Q = QueryUnderstandingModule;
+    if (Q.isRequirementQuery(query) && !Q.isInformationalQuery(query)) return false;
+
     const T = this.THRESHOLDS;
-    const qCore = QueryUnderstandingModule.coreTokens(query);
+    const qCore = Q.coreTokens(query);
 
     if (match.source === 'manual' || match.fullContent) {
       const sig = match.signals || (match.raw
@@ -7150,6 +7230,7 @@ const ResponseEngine = {
   /** Recupera candidatos y elige solo si hay confianza y margen suficientes */
   retrieve(query) {
     const T = this.THRESHOLDS;
+    const Q = QueryUnderstandingModule;
     const seen = new Set();
     const candidates = [];
 
@@ -7160,7 +7241,27 @@ const ResponseEngine = {
       candidates.push(candidate);
     };
 
-    QueryUnderstandingModule.queryVariants(query).forEach((q) => {
+    if (Q.isInformationalQuery(query) && !Q.isRequirementQuery(query)) {
+      const gadgetHit = GadgetKBModule.query(query);
+      if (gadgetHit?.entry && !gadgetHit.partial) {
+        const kbEntry = KnowledgeBaseModule.gadgetToKnowledge(gadgetHit.entry);
+        const sig = Q.scoreKnowledgeEntry(kbEntry, query);
+        if (sig.score >= T.SUGGEST) {
+          push({
+            source: 'manual',
+            score: Math.max(sig.score, gadgetHit.score || 0),
+            title: kbEntry.pregunta,
+            content: kbEntry.respuesta,
+            category: kbEntry.categoria,
+            raw: kbEntry,
+            fullContent: true,
+            signals: sig
+          });
+        }
+      }
+    }
+
+    Q.queryVariants(query).forEach((q) => {
       KnowledgeBaseModule.searchRanked(q, T.SUGGEST, 6).forEach(({ entry, score, ...signals }) => {
         push({
           source: 'manual',
@@ -7495,7 +7596,8 @@ const ResponseEngine = {
     }
     if (intent === 'ticket_create') {
       return this.finalizeResponse({
-        text: getChatMsg('ticketPrompt'), expression: 'happy',
+        text: this.buildRequirementHint(userText) + '\n\n' + getChatMsg('ticketPrompt'),
+        expression: 'happy',
         actions: [{ label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }],
         analytics: this.buildAnalytics('ticket_create', null, true)
       }, { ...ctxBase, query: userText });
@@ -7548,6 +7650,21 @@ const ResponseEngine = {
     }
 
     const query = this.buildContextualQuery(userText, conv);
+    if (QueryUnderstandingModule.isRequirementQuery(userText) && QueryUnderstandingModule.isInformationalQuery(userText)) {
+      const matchEarly = this.retrieve(query);
+      if (!matchEarly || matchEarly.score < this.THRESHOLDS.CONFIDENT) {
+        return this.finalizeResponse({
+          text: this.buildRequirementHint(userText) + '\n\nSi prefieres una **consulta informativa**, cuéntame con más detalle qué necesitas saber.',
+          expression: 'think',
+          actions: [
+            { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' },
+            { label: 'Ver temas', icon: 'menu', fn: 'ChatModule.showTopicsMenu()' }
+          ],
+          analytics: this.buildAnalytics('ticket_create', null, true)
+        }, { ...ctxBase, query: userText });
+      }
+    }
+
     const match = this.retrieve(query);
     const { text } = this.composeWithSuggestions(query, match, intent);
     const T = this.THRESHOLDS;
@@ -11342,7 +11459,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v19-timeline-dedup';",
+    "const CACHE_NAME='arturito-ai-v20-ai-intent';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
