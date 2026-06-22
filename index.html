@@ -1222,7 +1222,7 @@ body.mode-client #adminApp{display:none!important}
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" required></div>
             <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://kike01f.github.io/Chatbots-Hipodromo-definitivo/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-hipodromo.web.app/admin"></div>
-            <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en extensions/firestore-send-email.env"></div>
+            <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="activahipodromo@gmail.com" autocomplete="username" readonly title="Configurado en extensions/firestore-send-email.env"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="mayordomoactivahipodromo1876@gmail.com" readonly></div>
             <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
             <div class="form-group full"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="extensions/firestore-send-email.env"></div>
@@ -2435,8 +2435,8 @@ const ARTURITO_GADGET_KB_SEED = [
     mailCollection: 'mail',
     smtpAuthType: 'UsernamePassword',
     smtpAuthTypeLabel: 'Username & Password',
-    smtpConnectionUri: 'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
-    smtpFromEmail: 'conserjeria.wm815@gmail.com',
+    smtpConnectionUri: 'smtps://activahipodromo@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+    smtpFromEmail: 'activahipodromo@gmail.com',
     smtpReplyTo: 'mayordomoactivahipodromo1876@gmail.com',
     notifyAdminEmail: 'conserjeria.wm815@gmail.com',
     publicAppUrl: 'https://kike01f.github.io/Chatbots-Hipodromo-definitivo',
@@ -4761,8 +4761,8 @@ const DatabaseModule = {
         notifyAdminEmail: 'conserjeria.wm815@gmail.com',
         publicAppUrl: DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: 'https://chatbots-hipodromo.web.app/admin',
-        smtpConnectionUri: 'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
-        smtpFromEmail: 'conserjeria.wm815@gmail.com',
+        smtpConnectionUri: 'smtps://activahipodromo@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+        smtpFromEmail: 'activahipodromo@gmail.com',
         smtpReplyTo: 'mayordomoactivahipodromo1876@gmail.com',
         mailCollection: 'mail',
         firestoreLocation: 'southamerica-west1',
@@ -4784,8 +4784,8 @@ const DatabaseModule = {
       notifyAdminEmail:'conserjeria.wm815@gmail.com',
       publicAppUrl: DEFAULT_PUBLIC_APP_URL,
       adminPanelUrl:'https://chatbots-hipodromo.web.app/admin',
-      smtpConnectionUri:'smtps://conserjeria.wm815@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
-      smtpFromEmail:'conserjeria.wm815@gmail.com',
+      smtpConnectionUri:'smtps://activahipodromo@gmail.com:txkubuzfcisnlavq@smtp.gmail.com:465',
+      smtpFromEmail:'activahipodromo@gmail.com',
       smtpReplyTo:'mayordomoactivahipodromo1876@gmail.com',
       mailCollection:'mail',
       firestoreLocation:'southamerica-west1',
