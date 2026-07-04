@@ -975,7 +975,7 @@ tr.ticket-has-reply{background:linear-gradient(90deg,rgba(251,191,36,.16),transp
   <div id="chatBackdrop" class="chat-backdrop" aria-hidden="true" title="Cerrar chat"></div>
   <div class="chat-stack">
     <div class="chat-flotante-wrap">
-    <div id="chatFlotante" class="chat-flotante" role="dialog" aria-modal="false" aria-labelledby="chatHeaderBuilding" aria-hidden="true">
+    <div id="chatFlotante" class="chat-flotante" role="dialog" aria-modal="false" aria-labelledby="chatHeaderBuilding" aria-hidden="true" inert>
       <div class="chat-cloud-glow" aria-hidden="true"></div>
       <div class="chat-header">
         <div class="chat-header-main">
@@ -6992,6 +6992,8 @@ const GadgetModule = {
     if (isOpen) {
       dock.classList.remove('chat-closing');
       dock.classList.add('chat-animating', 'chat-opening', 'chat-open');
+      panel?.removeAttribute('inert');
+      if (panel) panel.inert = false;
       panel?.setAttribute('aria-hidden', 'false');
       panel?.setAttribute('aria-modal', 'true');
       backdrop?.setAttribute('aria-hidden', 'false');
@@ -7003,9 +7005,14 @@ const GadgetModule = {
       }, this.ANIM_MS + 60);
       setTimeout(() => document.getElementById('chatInput')?.focus(), this.ANIM_MS);
     } else {
-      if (panel?.contains(document.activeElement)) fab?.focus();
+      if (panel?.contains(document.activeElement)) {
+        fab?.focus({ preventScroll: true });
+        if (panel.contains(document.activeElement)) document.activeElement?.blur?.();
+      }
       dock.classList.add('chat-animating', 'chat-closing');
       dock.classList.remove('chat-open', 'chat-opening');
+      if (panel) panel.inert = true;
+      panel?.setAttribute('inert', '');
       panel?.setAttribute('aria-hidden', 'true');
       panel?.removeAttribute('aria-modal');
       backdrop?.setAttribute('aria-hidden', 'true');
