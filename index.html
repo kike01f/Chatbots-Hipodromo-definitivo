@@ -2673,11 +2673,22 @@ const ARTURITO_GADGET_KB_SEED = [
       }
       try {
         this._modules = await loadFirebaseModules();
-        const { initializeApp, getAuth, getFirestore, getStorage } = this._modules;
+        const { initializeApp, getAuth, getFirestore, initializeFirestore, getStorage } = this._modules;
         this.app = initializeApp(config);
         this.auth = getAuth(this.app);
         const dbId = config.firestoreDatabaseId || 'artutitohipodromo02';
-        this.db = getFirestore(this.app, dbId);
+        const firestoreSettings = {
+          experimentalForceLongPolling: true,
+          useFetchStreams: false,
+          ignoreUndefinedProperties: true
+        };
+        try {
+          this.db = initializeFirestore
+            ? initializeFirestore(this.app, firestoreSettings, dbId)
+            : getFirestore(this.app, dbId);
+        } catch (_) {
+          this.db = getFirestore(this.app, dbId);
+        }
         this.storage = getStorage(this.app);
         this.enabled = true;
         this.condominioId = config.condominioId || config.projectId || 'default';
