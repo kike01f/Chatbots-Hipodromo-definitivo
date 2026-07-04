@@ -10088,10 +10088,6 @@ const TicketManageModule = {
       toast('Firebase no conectado', 'error');
       return;
     }
-    if (!ArturitoCloud.fb.auth?.currentUser) {
-      toast('Inicia sesión con Firebase Auth para responder tickets', 'warning');
-      return;
-    }
     const btn = document.getElementById('btnTicketManageSubmit');
     if (btn) btn.disabled = true;
     try {
