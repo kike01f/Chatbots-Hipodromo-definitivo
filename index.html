@@ -2746,16 +2746,34 @@ const ARTURITO_GADGET_KB_SEED = [
       if (!this.fb.isEnabled()) return;
       const { onAuthStateChanged } = this.fb._modules;
       return new Promise((resolve) => {
+        let resolved = false;
+        const finish = (user) => {
+          if (onChange) onChange(user);
+          if (!resolved) {
+            resolved = true;
+            resolve(user);
+          }
+        };
         this._authUnsub = onAuthStateChanged(this.fb.auth, async (user) => {
-          if (user) {
-            this.profile = await this.loadProfile(user.uid);
-            this.currentUser = this.mapUser(user, this.profile);
-          } else {
+          try {
+            if (user) {
+              this.profile = await this.loadProfile(user.uid);
+              this.currentUser = this.mapUser(user, this.profile);
+            } else {
+              this.currentUser = null;
+              this.profile = null;
+            }
+          } catch (err) {
+            console.warn('[Auth] No se pudo cargar perfil Firebase:', err);
             this.currentUser = null;
             this.profile = null;
           }
-          if (onChange) onChange(this.currentUser);
-          resolve(this.currentUser);
+          finish(this.currentUser);
+        }, (err) => {
+          console.warn('[Auth] Estado Firebase no disponible:', err);
+          this.currentUser = null;
+          this.profile = null;
+          finish(null);
         });
       });
     }
@@ -2788,7 +2806,12 @@ const ARTURITO_GADGET_KB_SEED = [
       if (!this.fb.isEnabled()) return null;
       const { signInWithEmailAndPassword } = this.fb._modules;
       const cred = await signInWithEmailAndPassword(this.fb.auth, email, password);
-      this.profile = await this.loadProfile(cred.user.uid);
+      try {
+        this.profile = await this.loadProfile(cred.user.uid);
+      } catch (err) {
+        await this.logout().catch(() => {});
+        throw err;
+      }
       this.currentUser = this.mapUser(cred.user, this.profile);
       if (!this.isStaff(this.currentUser)) {
         await this.logout();
@@ -4683,6 +4706,14 @@ const CATEGORIES = ['Mantención','Postventa','Seguridad','Conserjería','Mudanz
 const STATUSES = ['Abierto','En Revisión','Asignado','En Proceso','Resuelto','Cerrado'];
 const PRIORITIES = ['Baja','Media','Alta','Crítica'];
 const ROLES = ['SuperAdmin','Administrador','Supervisor','Operador','Conserje','Residente','Comité'];
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  const msg = String(reason?.message || reason || '');
+  if (reason?.code === 'permission-denied' || /Missing or insufficient permissions/i.test(msg)) {
+    console.warn('[Firestore] Permiso insuficiente en operación secundaria:', reason);
+    event.preventDefault();
+  }
+});
 const DEFAULT_QUICK_QUESTIONS = ['¿Horario de conserjería?','¿Cómo pago gastos comunes?','¿Cómo reservo áreas comunes?','¿Estado de mi solicitud?','Hablar con un humano'];
 /** Accesos rápidos del chat: icono representativo + texto a insertar */
 const DEFAULT_CHAT_SHORTCUTS = [
@@ -6705,6 +6736,7 @@ const AuthModule = {
   async login() {
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value;
+    let firebaseLoginError = null;
 
     if (this.useFirebase()) {
       try {
@@ -6716,8 +6748,8 @@ const AuthModule = {
         toast('Bienvenido, ' + user.nombre, 'success');
         return true;
       } catch (err) {
-        toast(err.message || 'Credenciales incorrectas', 'error');
-        return false;
+        firebaseLoginError = err;
+        console.warn('[Auth] Firebase Auth falló; probando acceso interno:', err);
       }
     }
 
@@ -6731,7 +6763,7 @@ const AuthModule = {
       toast('Bienvenido, ' + user.nombre, 'success');
       return true;
     }
-    toast('Credenciales incorrectas', 'error');
+    toast(firebaseLoginError ? 'No se pudo iniciar con Firebase Auth ni con acceso interno' : 'Credenciales incorrectas', 'error');
     return false;
   },
   /** Recuperación de contraseña Firebase */
@@ -11892,22 +11924,36 @@ const NavModule = {
 };
 
 
-/** Limpia service workers antiguos: GitHub Pages sirve mejor esta app monolítica sin SW embebido. */
+/** Registra Service Worker embebido (PWA monolítica) */
 function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
-  var scopeUrl = new URL(scope, location.origin).href;
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(reg) {
-      if (reg.scope.indexOf(scopeUrl) === 0 || scopeUrl.indexOf(reg.scope) === 0) reg.unregister();
-    });
-  }).catch(function(){});
-  if ('caches' in window) {
-    caches.keys().then(function(keys) {
-      keys.filter(function(key) { return key.indexOf('arturito-ai-') === 0; })
-        .forEach(function(key) { caches.delete(key); });
-    }).catch(function(){});
-  }
+  var swCode = [
+    "const CACHE_NAME='arturito-ai-v49-admin-response-emojis';",
+    "self.addEventListener('install',function(e){",
+    "var SCOPE=self.registration.scope;",
+    "var OFFLINE=[",
+    "'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap',",
+    "'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'];",
+    "e.waitUntil(caches.open(CACHE_NAME).then(function(c){return c.addAll(OFFLINE.filter(Boolean));}).catch(function(){}));",
+    "self.skipWaiting();});",
+    "self.addEventListener('activate',function(e){",
+    "e.waitUntil(caches.keys().then(function(k){return Promise.all(k.filter(function(x){return x!==CACHE_NAME;}).map(function(x){return caches.delete(x);}));}));",
+    "self.clients.claim();});",
+    "self.addEventListener('fetch',function(e){",
+    "if(e.request.method!=='GET')return;",
+    "var u=new URL(e.request.url);",
+    "if(u.origin.indexOf('googleapis.com')>-1||u.origin.indexOf('gstatic.com')>-1||u.origin.indexOf('cdnjs.cloudflare.com')>-1){",
+    "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));return;}",
+    "var scope=self.registration.scope;",
+    "var isAppShell=e.request.mode==='navigate'||/index\\.html$/i.test(u.pathname)||u.pathname===scope.replace(/\\/$/,'')||u.pathname===scope;",
+    "if(isAppShell){",
+    "e.respondWith(fetch(e.request).then(function(r){if(!r||r.status!==200)return r;return caches.open(CACHE_NAME).then(function(c){c.put(e.request,r.clone());return r;});}).catch(function(){return caches.match(e.request);}));return;}",
+    "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));",
+    "});"
+  ].join('');
+  var blob = new Blob([swCode], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob), { scope: scope }).catch(function(){});
 }
 
 /* ─── App — Orquestador principal ─── */
