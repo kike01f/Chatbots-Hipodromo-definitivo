@@ -799,6 +799,73 @@ body.mode-client #adminApp{display:none!important}
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
 .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem}
 .chart-card h4{font-size:.85rem;margin-bottom:.75rem;color:var(--text-muted);font-weight:600}
+
+/* Microinteracciones: emojis estilo WhatsApp y estrellas animadas */
+.chat-emoji-popover{
+  display:none;position:absolute;bottom:calc(100% + 10px);left:.6rem;right:.6rem;
+  max-height:min(232px,42vh);overflow-y:auto;padding:.62rem;
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
+  border:1px solid rgba(148,163,184,.28);border-radius:22px;flex-wrap:wrap;gap:.28rem;
+  box-shadow:0 -18px 46px rgba(15,23,42,.18),0 1px 0 rgba(255,255,255,.9) inset;
+  z-index:20;-webkit-overflow-scrolling:touch;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transform-origin:bottom center
+}
+.chat-dock.chat-emoji-open .chat-emoji-popover{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));animation:emojiTrayIn .18s cubic-bezier(.2,.9,.25,1.2)}
+.chat-emoji-popover::before{
+  content:'Emojis';grid-column:1/-1;font-size:.68rem;font-weight:800;color:#64748b;
+  letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .25rem
+}
+.chat-emoji-popover button,.emoji-btn,.ticket-response-emoji{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  border:none;background:transparent;cursor:pointer;line-height:1;user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:transform .16s cubic-bezier(.2,.9,.25,1.4),background .16s,box-shadow .16s,filter .16s
+}
+.chat-emoji-popover button{
+  width:34px;height:34px;padding:0;border-radius:12px;font-size:1.35rem;color:inherit;
+  animation:emojiPop .24s cubic-bezier(.2,.9,.25,1.35) both;
+  animation-delay:calc(min(var(--emoji-i,0),24) * 10ms)
+}
+.chat-emoji-popover button:hover,.chat-emoji-popover button:focus-visible,
+.emoji-btn:hover,.emoji-btn:focus-visible,.ticket-response-emoji:hover,.ticket-response-emoji:focus-visible{
+  transform:translateY(-2px) scale(1.22) rotate(-3deg);
+  background:rgba(127,186,2,.12);box-shadow:0 8px 18px rgba(15,23,42,.12);filter:saturate(1.14);outline:none
+}
+.chat-emoji-popover button:active,.emoji-btn:active,.ticket-response-emoji:active{transform:scale(.88);animation:emojiBounce .32s ease}
+.ticket-response-emoji-row{padding:.45rem;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(148,163,184,.22);box-shadow:0 8px 24px rgba(15,23,42,.06) inset}
+.ticket-response-emoji{min-width:34px;height:34px;font-size:1.18rem;padding:0;border-radius:12px;background:#fff;border:1px solid rgba(148,163,184,.18)}
+.chat-rating-prompt{
+  position:relative;overflow:hidden;margin-top:.55rem;padding:.72rem .78rem;
+  background:linear-gradient(135deg,rgba(255,251,235,.96),rgba(240,253,244,.94));
+  border:1px solid rgba(245,158,11,.28);border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,23,42,.08);animation:ratingPromptIn .24s cubic-bezier(.2,.9,.25,1.2)
+}
+.chat-rating-prompt::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 0%,rgba(255,255,255,.55) 45%,transparent 70%);transform:translateX(-120%);animation:ratingShine .75s ease .16s 1;pointer-events:none}
+.chat-rating-prompt p{font-size:.74rem;color:#92400e;margin:0 0 .46rem;font-weight:800}
+.chat-rating-stars{display:flex;gap:.18rem;align-items:center;flex-wrap:wrap}
+.chat-rating-stars button{
+  position:relative;background:none;border:none;font-size:1.55rem;line-height:1;cursor:pointer;color:#f59e0b;
+  opacity:.34;filter:grayscale(.35);transition:opacity .14s,transform .14s,filter .14s,text-shadow .14s;
+  padding:.04rem .12rem;text-shadow:none;transform-origin:center
+}
+.chat-rating-stars button:hover,.chat-rating-stars button:focus,
+.chat-rating-stars button.is-preview{opacity:1;filter:none;transform:translateY(-2px) scale(1.18);text-shadow:0 6px 14px rgba(245,158,11,.38);outline:none}
+.chat-rating-stars button.is-preview:nth-child(1){animation:starPulse .28s ease both}
+.chat-rating-stars button.is-preview:nth-child(2){animation:starPulse .28s ease .03s both}
+.chat-rating-stars button.is-preview:nth-child(3){animation:starPulse .28s ease .06s both}
+.chat-rating-stars button.is-preview:nth-child(4){animation:starPulse .28s ease .09s both}
+.chat-rating-stars button.is-preview:nth-child(5){animation:starPulse .28s ease .12s both}
+.chat-rating-stars button:active{transform:scale(.86)}
+.chat-rating-done{display:inline-flex;align-items:center;gap:.1rem;font-size:.78rem;color:#92400e;margin-top:.45rem;font-weight:800;background:#fef3c7;border:1px solid rgba(245,158,11,.3);border-radius:999px;padding:.24rem .58rem;animation:ratingDonePop .26s cubic-bezier(.2,.9,.25,1.25)}
+@keyframes emojiTrayIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes emojiPop{from{opacity:0;transform:translateY(8px) scale(.78)}to{opacity:1;transform:none}}
+@keyframes emojiBounce{0%{transform:scale(.9)}60%{transform:scale(1.22)}100%{transform:scale(1)}}
+@keyframes ratingPromptIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes ratingShine{to{transform:translateX(120%)}}
+@keyframes starPulse{0%{transform:scale(.9)}55%{transform:translateY(-3px) scale(1.24)}100%{transform:translateY(-2px) scale(1.18)}}
+@keyframes ratingDonePop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .chat-emoji-popover,.chat-emoji-popover button,.chat-rating-prompt,.chat-rating-prompt::after,.chat-rating-stars button,.chat-rating-done{animation:none!important;transition:none!important}
+}
 </style>
 <script>
 (function(){
@@ -1155,8 +1222,6 @@ body.mode-client #adminApp{display:none!important}
             <div class="training-stat"><div class="training-stat-value" id="statTopicCount">0</div><div class="training-stat-label">Temas detectados</div></div>
             <div class="training-stat"><div class="training-stat-value" id="statLastUpload">—</div><div class="training-stat-label">Última carga</div></div>
             <div class="training-stat"><div class="training-stat-value" id="statChatInteractions">0</div><div class="training-stat-label">Interacciones chat</div></div>
-            <div class="training-stat"><div class="training-stat-value" id="statChatToday">0</div><div class="training-stat-label">Preguntas hoy</div></div>
-            <div class="training-stat"><div class="training-stat-value" id="statChatDailyTarget">5-7</div><div class="training-stat-label">Meta diaria anónima</div></div>
             <div class="training-stat"><div class="training-stat-value" id="statChatRatings">0</div><div class="training-stat-label">Evaluaciones</div></div>
             <div class="training-stat"><div class="training-stat-value" id="statChatAvgRating">—</div><div class="training-stat-label">Calificación prom.</div></div>
             <div class="training-stat"><div class="training-stat-value" id="statChatWeek">0</div><div class="training-stat-label">Interacciones (7 días)</div></div>
@@ -3266,12 +3331,6 @@ const ARTURITO_GADGET_KB_SEED = [
 
   /* ─── DashboardManager ─── */
   class DashboardManager {
-    static todayStart() {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      return d.getTime();
-    }
-
     static computeMetrics(database, chatSessions = []) {
       const t = database.tickets || [];
       const openStates = ['Abierto', 'En Revisión', 'Asignado', 'En Proceso'];
@@ -3285,16 +3344,6 @@ const ARTURITO_GADGET_KB_SEED = [
         : 0;
       const avgHours = avgMs ? Math.round(avgMs / 3600000) : 0;
       const docs = database.trainingDocs || database.documents || [];
-      const chatInteractions = database.chatInteractions || [];
-      const chatSummary = database.settings?.chatAnalytics || {};
-      const chatStats = typeof ChatAnalyticsModule !== 'undefined' ? ChatAnalyticsModule.getStats() : null;
-      const todayStart = this.todayStart();
-      const d = new Date(todayStart);
-      const todayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const questionsAnsweredToday = chatInteractions.filter((i) =>
-        (i.createdAt || 0) >= todayStart && i.source !== 'fallback'
-      ).length;
-      const chatInteractionTotal = Math.max(chatInteractions.length, chatSummary.totalInteractions || 0);
       return {
         totalTickets: t.length,
         openTickets: open.length,
@@ -3303,9 +3352,6 @@ const ARTURITO_GADGET_KB_SEED = [
         avgResponseHours: avgHours,
         activeUsers: (database.users || []).filter((u) => u.activo !== false).length,
         aiConversations: (database.conversations || []).length + chatSessions.length,
-        chatInteractions: chatStats ? chatStats.total : chatInteractionTotal,
-        questionsAnsweredToday: chatStats ? chatStats.answeredToday : Math.max(questionsAnsweredToday, chatSummary.answeredByDay?.[todayKey] || 0),
-        dailyInteractionTarget: '5-7',
         trainedDocuments: docs.length || (database.knowledge || []).length,
         satisfaction: database.settings?.satisfactionScore || 92
       };
@@ -3320,9 +3366,6 @@ const ARTURITO_GADGET_KB_SEED = [
         { label: 'Tiempo prom. respuesta', value: metrics.avgResponseHours + 'h', cls: 'teal' },
         { label: 'Usuarios activos', value: metrics.activeUsers, cls: 'blue' },
         { label: 'Conversaciones IA', value: metrics.aiConversations, cls: 'indigo' },
-        { label: 'Interacciones chat', value: metrics.chatInteractions, cls: 'indigo' },
-        { label: 'Preguntas hoy', value: metrics.questionsAnsweredToday, cls: 'teal' },
-        { label: 'Meta diaria IA', value: metrics.dailyInteractionTarget, cls: 'blue' },
         { label: 'Documentos entrenados', value: metrics.trainedDocuments, cls: 'purple' },
         { label: 'Satisfacción', value: metrics.satisfaction + '%', cls: 'green' }
       ];
@@ -3616,25 +3659,15 @@ const ARTURITO_GADGET_KB_SEED = [
     rebuildChatAnalyticsSummary(interactions) {
       const s = {
         totalInteractions: 0,
-        questionsAnswered: 0,
         totalRatings: 0,
         ratingSum: 0,
         bySource: {},
-        byDay: {},
-        answeredByDay: {},
         ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
       };
       (interactions || []).forEach((i) => {
         s.totalInteractions += 1;
         const src = i.source || 'unknown';
         s.bySource[src] = (s.bySource[src] || 0) + 1;
-        if (src !== 'fallback') s.questionsAnswered += 1;
-        if (i.createdAt) {
-          const d = new Date(i.createdAt);
-          const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          s.byDay[day] = (s.byDay[day] || 0) + 1;
-          if (src !== 'fallback') s.answeredByDay[day] = (s.answeredByDay[day] || 0) + 1;
-        }
         if (i.rating != null) {
           s.totalRatings += 1;
           s.ratingSum += i.rating;
@@ -3650,7 +3683,7 @@ const ARTURITO_GADGET_KB_SEED = [
       await setDoc(doc(this.fb.col('chat_interactions'), entry.id), {
         conversationId: entry.conversationId || '',
         messageId: entry.messageId || '',
-        userQuery: '',
+        userQuery: entry.userQuery || '',
         topicTitle: entry.topicTitle || '',
         source: entry.source || 'unknown',
         intent: entry.intent || 'question',
@@ -3838,8 +3871,7 @@ const ARTURITO_GADGET_KB_SEED = [
         firestoreTtlType: s.firestoreTtlType || defs.firestoreTtlType || 'Never',
         ticketEmailMode: 'extension',
         chatAnalytics: s.chatAnalytics ? JSON.parse(JSON.stringify(s.chatAnalytics)) : {
-          totalInteractions: 0, questionsAnswered: 0, totalRatings: 0, ratingSum: 0,
-          bySource: {}, byDay: {}, answeredByDay: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+          totalInteractions: 0, totalRatings: 0, ratingSum: 0, bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
         },
         updatedAt: Date.now()
       };
@@ -4866,8 +4898,8 @@ const DatabaseModule = {
     if (!database.chatInteractions) database.chatInteractions = [];
     if (!database.settings.chatAnalytics) {
       database.settings.chatAnalytics = {
-        totalInteractions: 0, questionsAnswered: 0, totalRatings: 0, ratingSum: 0,
-        bySource: {}, byDay: {}, answeredByDay: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        totalInteractions: 0, totalRatings: 0, ratingSum: 0,
+        bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
       };
     }
     if (typeof KnowledgeBaseModule !== 'undefined') KnowledgeBaseModule.syncFromGadget();
@@ -7743,77 +7775,20 @@ const ResponseEngine = {
 const ChatAnalyticsModule = {
   RATING_DELAY_MS: 60000,
   MAX_LOCAL: 500,
-  SYNTHETIC_DEMO_START: '2026-06-24',
-  SYNTHETIC_DEMO_DAYS: [
-    { date: '2026-06-24', interactions: 5, answered: 5, ratings: [5, 4] },
-    { date: '2026-06-25', interactions: 6, answered: 6, ratings: [5, 5, 4] },
-    { date: '2026-06-26', interactions: 7, answered: 6, ratings: [4, 5] },
-    { date: '2026-06-27', interactions: 5, answered: 5, ratings: [5, 4] },
-    { date: '2026-06-28', interactions: 6, answered: 5, ratings: [4, 4, 5] },
-    { date: '2026-06-29', interactions: 7, answered: 7, ratings: [5, 5, 4] },
-    { date: '2026-06-30', interactions: 6, answered: 6, ratings: [5, 4] }
-  ],
   _timers: new Map(),
 
   ensure() {
     if (!database.chatInteractions) database.chatInteractions = [];
     if (!database.settings.chatAnalytics) {
       database.settings.chatAnalytics = {
-        totalInteractions: 0, questionsAnswered: 0, totalRatings: 0, ratingSum: 0,
-        bySource: {}, byDay: {}, answeredByDay: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        totalInteractions: 0, totalRatings: 0, ratingSum: 0,
+        bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
       };
     }
-    database.settings.chatAnalytics.byDay = database.settings.chatAnalytics.byDay || {};
-    database.settings.chatAnalytics.answeredByDay = database.settings.chatAnalytics.answeredByDay || {};
   },
 
   emptySummary() {
-    return { totalInteractions: 0, questionsAnswered: 0, totalRatings: 0, ratingSum: 0, bySource: {}, byDay: {}, answeredByDay: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
-  },
-
-  dayKey(ts = Date.now()) {
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  },
-
-  isAnswered(entry) {
-    return entry?.source !== 'fallback';
-  },
-
-  syntheticDemoEntries() {
-    const today = this.dayKey();
-    const topics = [
-      'Horario de conserjería',
-      'Gastos comunes',
-      'Reservas de espacios',
-      'Estado de solicitud',
-      'Normas de mascotas',
-      'Uso de quinchos',
-      'Emergencias edificio'
-    ];
-    const sources = ['gadget', 'manual', 'document', 'ticket_lookup'];
-    return this.SYNTHETIC_DEMO_DAYS
-      .filter((day) => day.date >= this.SYNTHETIC_DEMO_START && day.date <= today)
-      .flatMap((day) => Array.from({ length: day.interactions }, (_, idx) => {
-        const answered = idx < day.answered;
-        const hour = 9 + ((idx * 2) % 10);
-        const minute = (idx * 11) % 60;
-        const rating = day.ratings[idx] || null;
-        return {
-          id: `ci_demo_${day.date}_${idx + 1}`,
-          conversationId: `demo_${day.date}`,
-          messageId: `demo_msg_${day.date}_${idx + 1}`,
-          userQuery: '',
-          topicTitle: answered ? topics[(idx + day.date.charCodeAt(9)) % topics.length] : 'Sin respuesta detectada',
-          source: answered ? sources[idx % sources.length] : 'fallback',
-          intent: answered ? 'demo_question' : 'fallback',
-          confidence: answered ? Math.min(96, 72 + ((idx * 5) % 22)) : 0,
-          createdAt: new Date(`${day.date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).getTime(),
-          rating,
-          ratedAt: rating ? new Date(`${day.date}T${String(hour + 1).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).getTime() : null,
-          synthetic: true
-        };
-      }));
+    return { totalInteractions: 0, totalRatings: 0, ratingSum: 0, bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
   },
 
   mergeSummary(local, remote) {
@@ -7821,22 +7796,15 @@ const ChatAnalyticsModule = {
     const b = remote || this.emptySummary();
     const bySource = { ...(b.bySource || {}) };
     Object.entries(a.bySource || {}).forEach(([k, v]) => { bySource[k] = (bySource[k] || 0) + v; });
-    const byDay = { ...(b.byDay || {}) };
-    Object.entries(a.byDay || {}).forEach(([k, v]) => { byDay[k] = (byDay[k] || 0) + v; });
-    const answeredByDay = { ...(b.answeredByDay || {}) };
-    Object.entries(a.answeredByDay || {}).forEach(([k, v]) => { answeredByDay[k] = (answeredByDay[k] || 0) + v; });
     const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     [1, 2, 3, 4, 5].forEach((n) => {
       ratingCounts[n] = (a.ratingCounts?.[n] || 0) + (b.ratingCounts?.[n] || 0);
     });
     return {
       totalInteractions: (a.totalInteractions || 0) + (b.totalInteractions || 0),
-      questionsAnswered: (a.questionsAnswered || 0) + (b.questionsAnswered || 0),
       totalRatings: (a.totalRatings || 0) + (b.totalRatings || 0),
       ratingSum: (a.ratingSum || 0) + (b.ratingSum || 0),
       bySource,
-      byDay,
-      answeredByDay,
       ratingCounts
     };
   },
@@ -7849,14 +7817,6 @@ const ChatAnalyticsModule = {
       const src = entry.source || 'unknown';
       s.bySource = s.bySource || {};
       s.bySource[src] = (s.bySource[src] || 0) + 1;
-      s.byDay = s.byDay || {};
-      s.answeredByDay = s.answeredByDay || {};
-      const day = this.dayKey(entry.createdAt || Date.now());
-      s.byDay[day] = (s.byDay[day] || 0) + 1;
-      if (this.isAnswered(entry)) {
-        s.questionsAnswered = (s.questionsAnswered || 0) + 1;
-        s.answeredByDay[day] = (s.answeredByDay[day] || 0) + 1;
-      }
     }
     if (entry.rating != null) {
       s.totalRatings = (s.totalRatings || 0) + 1;
@@ -7878,7 +7838,7 @@ const ChatAnalyticsModule = {
       id: DatabaseModule.uid('ci'),
       conversationId: opts.conversationId,
       messageId: opts.messageId,
-      userQuery: '',
+      userQuery: String(opts.userQuery || '').slice(0, 500),
       topicTitle: opts.topicTitle || '',
       source: opts.source || 'unknown',
       intent: opts.intent || 'question',
@@ -7964,44 +7924,21 @@ const ChatAnalyticsModule = {
 
   getStats() {
     this.ensure();
-    const synthetic = this.syntheticDemoEntries();
-    const list = [...synthetic, ...(database.chatInteractions || [])];
+    const list = database.chatInteractions;
     const cloud = database.settings.chatAnalytics || this.emptySummary();
     const weekAgo = Date.now() - 7 * 86400000;
-    const today = this.dayKey();
     const rated = list.filter(i => i.rating != null);
     const avgLocal = rated.length ? (rated.reduce((s, i) => s + i.rating, 0) / rated.length).toFixed(1) : null;
     const avgCloud = cloud.totalRatings ? (cloud.ratingSum / cloud.totalRatings).toFixed(1) : null;
-    const bySource = { ...(cloud.bySource || {}) };
-    const ratingCounts = { ...(cloud.ratingCounts || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }) };
-    list.forEach((i) => {
-      const src = i.source || 'unknown';
-      bySource[src] = Math.max(bySource[src] || 0, list.filter(x => (x.source || 'unknown') === src).length);
-      if (i.rating != null) ratingCounts[i.rating] = Math.max(ratingCounts[i.rating] || 0, list.filter(x => x.rating === i.rating).length);
-    });
-    const todayLocal = list.filter(i => this.dayKey(i.createdAt) === today).length;
-    const answeredTodayLocal = list.filter(i => this.dayKey(i.createdAt) === today && this.isAnswered(i)).length;
-    const last7Local = list.filter(i => i.createdAt >= weekAgo).length;
-    const dailyCounts = Array.from({ length: 7 }, (_, idx) => {
-      const d = new Date(Date.now() - idx * 86400000);
-      const key = this.dayKey(d.getTime());
-      const local = list.filter(i => this.dayKey(i.createdAt) === key).length;
-      return Math.max(local, cloud.byDay?.[key] || 0);
-    });
-    const avgDaily = Math.round((dailyCounts.reduce((s, n) => s + n, 0) / 7) * 10) / 10;
     return {
       total: Math.max(list.length, cloud.totalInteractions || 0),
       totalCloud: cloud.totalInteractions || 0,
       rated: Math.max(rated.length, cloud.totalRatings || 0),
       avgRating: avgCloud || avgLocal || '—',
-      last7: Math.max(last7Local, dailyCounts.reduce((s, n) => s + n, 0)),
-      today: Math.max(todayLocal, cloud.byDay?.[today] || 0),
-      answeredToday: Math.max(answeredTodayLocal, cloud.answeredByDay?.[today] || 0),
-      avgDaily: avgDaily || '—',
-      dailyTarget: '5-7',
-      bySource,
-      ratingCounts,
-      recent: list.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 15)
+      last7: list.filter(i => i.createdAt >= weekAgo).length,
+      bySource: cloud.bySource || {},
+      ratingCounts: cloud.ratingCounts || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      recent: list.slice(-15).reverse()
     };
   }
 };
@@ -8036,8 +7973,8 @@ const ChatModule = {
   renderChatShortcuts() {
     const bar = document.getElementById('emojiBar');
     if (!bar) return;
-    bar.innerHTML = getChatShortcuts().map(s =>
-      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}">${icon(s.icon, 'md')}</button>`
+    bar.innerHTML = getChatShortcuts().map((s, index) =>
+      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" aria-label="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}" style="--emoji-i:${index}">${icon(s.icon, 'md')}</button>`
     ).join('');
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
@@ -8404,6 +8341,28 @@ const ChatModule = {
     const box = document.getElementById('chatMessages');
     if (!box || box.dataset.ratingBound) return;
     box.dataset.ratingBound = '1';
+    const previewStars = (group, value = 0) => {
+      if (!group) return;
+      group.querySelectorAll('[data-rate]').forEach((btn) => {
+        btn.classList.toggle('is-preview', Number(btn.dataset.rate) <= value);
+      });
+    };
+    box.addEventListener('mouseover', (e) => {
+      const rateBtn = e.target.closest('[data-rate]');
+      if (rateBtn) previewStars(rateBtn.closest('.chat-rating-stars'), Number(rateBtn.dataset.rate));
+    });
+    box.addEventListener('mouseout', (e) => {
+      const group = e.target.closest?.('.chat-rating-stars');
+      if (group && !group.contains(e.relatedTarget)) previewStars(group, 0);
+    });
+    box.addEventListener('focusin', (e) => {
+      const rateBtn = e.target.closest('[data-rate]');
+      if (rateBtn) previewStars(rateBtn.closest('.chat-rating-stars'), Number(rateBtn.dataset.rate));
+    });
+    box.addEventListener('focusout', (e) => {
+      const group = e.target.closest?.('.chat-rating-stars');
+      if (group) previewStars(group, 0);
+    });
     box.addEventListener('click', (e) => {
       const rateBtn = e.target.closest('[data-rate]');
       if (rateBtn) {
@@ -10555,14 +10514,10 @@ const TrainingModule = {
     document.getElementById('statLastUpload').textContent = last ? fmtDate(last.createdAt).split(',')[0] : '—';
     const chatStats = ChatAnalyticsModule.getStats();
     const statChatInteractions = document.getElementById('statChatInteractions');
-    const statChatToday = document.getElementById('statChatToday');
-    const statChatDailyTarget = document.getElementById('statChatDailyTarget');
     const statChatRatings = document.getElementById('statChatRatings');
     const statChatAvgRating = document.getElementById('statChatAvgRating');
     const statChatWeek = document.getElementById('statChatWeek');
-    if (statChatInteractions) statChatInteractions.textContent = chatStats.total;
-    if (statChatToday) statChatToday.textContent = chatStats.answeredToday;
-    if (statChatDailyTarget) statChatDailyTarget.textContent = chatStats.dailyTarget;
+    if (statChatInteractions) statChatInteractions.textContent = chatStats.totalCloud || chatStats.total;
     if (statChatRatings) statChatRatings.textContent = chatStats.rated;
     if (statChatAvgRating) statChatAvgRating.textContent = chatStats.avgRating;
     if (statChatWeek) statChatWeek.textContent = chatStats.last7;
@@ -10577,10 +10532,10 @@ const TrainingModule = {
     }
     const sourceLabel = { gadget: 'Gadget', manual: 'Manual', document: 'Documento', system: 'Sistema', unknown: 'Otro', fallback: 'Sin match' };
     wrap.innerHTML = `<table class="chat-interactions-table"><thead><tr>
-      <th>Fecha</th><th>Registro anónimo</th><th>Fuente</th><th>Confianza</th><th>Evaluación</th>
+      <th>Fecha</th><th>Consulta</th><th>Fuente</th><th>Confianza</th><th>Evaluación</th>
     </tr></thead><tbody>${recent.map(i => `<tr>
       <td>${fmtDate(i.createdAt).split(',')[0]}</td>
-      <td>${escapeHtml(String(i.topicTitle || (i.source === 'fallback' ? 'Sin respuesta detectada' : 'Pregunta respondida')).slice(0, 60))}${i.synthetic ? ' <span class="badge badge-review">Demo</span>' : ''}</td>
+      <td>${escapeHtml(String(i.userQuery || i.topicTitle || '—').slice(0, 60))}</td>
       <td>${escapeHtml(sourceLabel[i.source] || i.source || '—')}</td>
       <td>${i.confidence != null ? i.confidence + '%' : '—'}</td>
       <td>${i.rating ? '★'.repeat(i.rating) : '—'}</td>
@@ -11413,8 +11368,7 @@ const ReportModule = {
   },
   chatbotConfidenceData() {
     let high = 0, mid = 0, low = 0;
-    const synthetic = typeof ChatAnalyticsModule !== 'undefined' ? ChatAnalyticsModule.syntheticDemoEntries() : [];
-    [...synthetic, ...(database.chatInteractions || [])].forEach(i => {
+    (database.chatInteractions || []).forEach(i => {
       if (i.confidence == null) return;
       if (i.confidence >= 70) high++;
       else if (i.confidence >= 40) mid++;
@@ -11440,7 +11394,7 @@ const ReportModule = {
   },
   platformUsageData() {
     const docs = (typeof IDBModule !== 'undefined' && IDBModule.documentsCache) ? IDBModule.documentsCache.length : 0;
-    const chatTotal = ChatAnalyticsModule.getStats().total || database.chatInteractions?.length || 0;
+    const chatTotal = ChatAnalyticsModule.getStats().totalCloud || database.chatInteractions?.length || 0;
     return {
       labels: ['Tickets', 'Usuarios', 'Conversaciones', 'Interacciones chat', 'Documentos'],
       values: [
