@@ -4258,10 +4258,12 @@ const ARTURITO_GADGET_KB_SEED = [
             if (options.interaction) {
               await this.sync.pushChatInteraction(options.interaction);
             }
-            database.settings = database.settings || {};
-            database.settings.updatedAt = Date.now();
-            await this.sync.ensureCondominioDoc(database.settings?.buildingName);
-            await this.sync.syncSettings(database.settings);
+            if (scope === 'full' && this.fb.auth?.currentUser) {
+              database.settings = database.settings || {};
+              database.settings.updatedAt = Date.now();
+              await this.sync.ensureCondominioDoc(database.settings?.buildingName);
+              await this.sync.syncSettings(database.settings);
+            }
           } catch (err) {
             cloudOk = false;
             lastErr = err;
