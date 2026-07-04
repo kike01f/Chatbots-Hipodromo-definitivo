@@ -6737,8 +6737,9 @@ const AuthModule = {
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value;
     let firebaseLoginError = null;
+    const isValidFirebaseEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    if (this.useFirebase()) {
+    if (this.useFirebase() && isValidFirebaseEmail) {
       try {
         const user = await ArturitoCloud.auth.login(email, pass);
         this.currentUser = user;
