@@ -430,6 +430,29 @@ body.mode-client #adminApp{display:none!important}
 .chat-msg-actions-btns{margin-top:.4rem;display:flex;gap:.35rem;flex-wrap:wrap}
 .chat-msg-actions-btns button{font-size:.72rem;padding:.28rem .55rem;border-radius:8px;border:1px solid rgba(127,186,2,.35);background:rgba(127,186,2,.08);color:var(--arturito-green-dark);cursor:pointer;font-weight:600;transition:all .15s}
 .chat-msg-actions-btns button:hover{background:rgba(127,186,2,.2)}
+.chat-human-card{overflow:hidden;border:1px solid rgba(127,186,2,.22);border-radius:18px;background:linear-gradient(180deg,#fff 0%,#f7fbea 100%);box-shadow:0 12px 30px rgba(15,23,42,.08);margin:-.1rem -.15rem .2rem;color:#1f2937}
+.chat-human-hero{display:flex;align-items:center;gap:.75rem;padding:.9rem .95rem;background:linear-gradient(135deg,rgba(127,186,2,.16),rgba(13,148,136,.08));border-bottom:1px solid rgba(127,186,2,.18)}
+.chat-human-avatar{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.75rem;background:#fff;box-shadow:0 8px 22px rgba(127,186,2,.18),inset 0 0 0 1px rgba(127,186,2,.18);flex-shrink:0}
+.chat-human-kicker{font-size:.68rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--arturito-green-dark,#5a8501);margin-bottom:.12rem}
+.chat-human-title{font-size:1rem;font-weight:900;line-height:1.15;color:#111827}
+.chat-human-sub{font-size:.78rem;color:#4b5563;margin-top:.18rem;line-height:1.35}
+.chat-human-body{padding:.85rem .95rem .95rem;display:grid;gap:.65rem}
+.chat-human-steps{display:grid;gap:.45rem}
+.chat-human-step{display:flex;gap:.55rem;align-items:flex-start;padding:.55rem .6rem;border:1px solid rgba(148,163,184,.22);border-radius:14px;background:rgba(255,255,255,.78)}
+.chat-human-step-icon{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(127,186,2,.12);font-size:1rem;flex-shrink:0}
+.chat-human-step strong{display:block;font-size:.82rem;color:#111827;line-height:1.25}
+.chat-human-step span{display:block;font-size:.74rem;color:#6b7280;line-height:1.35;margin-top:.08rem}
+.chat-human-phone{display:flex;align-items:center;gap:.55rem;padding:.7rem .75rem;border-radius:16px;background:#111827;color:#fff;box-shadow:0 10px 24px rgba(17,24,39,.18)}
+.chat-human-phone-icon{width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.chat-human-phone small{display:block;color:rgba(255,255,255,.72);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.chat-human-phone strong{display:block;color:#fff;font-size:.95rem;letter-spacing:.01em}
+.chat-human-note{font-size:.74rem;line-height:1.4;color:#4b5563;background:rgba(127,186,2,.08);border:1px dashed rgba(127,186,2,.32);border-radius:14px;padding:.55rem .65rem}
+.chat-human-card + .topic-suggestions-wrap{margin-top:.55rem}
+.chat-msg-row.otro.human-escalation .chat-msg-bubble{padding:.45rem;background:transparent;box-shadow:none;border:none}
+.chat-msg-row.otro.human-escalation .chat-msg-author{margin:.05rem .35rem .3rem}
+.chat-msg-row.otro.human-escalation .chat-msg-actions-btns{margin:.55rem .15rem .1rem}
+.chat-msg-row.otro.human-escalation .chat-msg-actions-btns button{border-radius:999px;padding:.42rem .7rem;font-size:.76rem;background:#fff;border-color:rgba(127,186,2,.35);box-shadow:0 4px 12px rgba(15,23,42,.08)}
+.chat-msg-row.otro.human-escalation .chat-msg-actions-btns button:first-child{background:rgba(127,186,2,.12);font-weight:800}
 
 /* Menú de temas categorizado (estilo Arturito Gadget) */
 .chat-msg-body .topics-menu-wrap{margin-top:.5rem}
@@ -7560,7 +7583,7 @@ const ResponseEngine = {
 
     if (intent === 'escalate') {
       return this.finalizeResponse({
-        text: getChatMsg('escalate'), expression: 'happy', actions: ticketActions,
+        text: getChatMsg('escalate'), expression: 'happy', actions: ticketActions, humanEscalation: true,
         analytics: this.buildAnalytics('escalate', null, true)
       }, { ...ctxBase, query: userText });
     }
@@ -7993,6 +8016,9 @@ const ChatModule = {
       bodyContent = escapeHtml(m.text).replace(/\n/g, '<br>');
     } else if (m.ticketStatus && m.ticketStatusHtml) {
       bodyContent = m.ticketStatusHtml;
+    } else if (m.humanEscalation) {
+      bodyContent = this.humanEscalationHTML(m.text);
+      if (m.topicSuggestions?.length) bodyContent += GadgetKBModule.generateSuggestionsHTML(m.topicSuggestions);
     } else if (m.topicsMenu) {
       bodyContent = formatBotText(m.text) + GadgetKBModule.generateTopicsMenuHTML();
     } else if (m.topicSuggestions?.length) {
@@ -8011,12 +8037,44 @@ const ChatModule = {
       </div>`;
     }
     const msgAttrs = `data-msg-id="${escapeHtml(m.id || '')}"${m.interactionId ? ` data-interaction-id="${escapeHtml(m.interactionId)}"` : ''}`;
-    return `<div class="chat-msg-row ${row}" ${msgAttrs}><div class="chat-msg-bubble-wrap"><div class="chat-msg-bubble">
+    return `<div class="chat-msg-row ${row}${m.humanEscalation ? ' human-escalation' : ''}" ${msgAttrs}><div class="chat-msg-bubble-wrap"><div class="chat-msg-bubble">
       ${!isUser ? `<div class="chat-msg-author">${botName}</div>` : ''}
       <div class="chat-msg-body">${bodyContent}</div>
       ${!isUser && m.confidence != null ? `<div class="chat-confidence${m.confidence < 70 ? ' low' : ''}">Confianza: ${m.confidence}%</div>` : ''}
       ${ratingBlock}${actions}<div class="chat-msg-meta"><span class="chat-msg-time">${fmtDate(m.time)}</span></div>
     </div></div></div>`;
+  },
+  humanEscalationHTML(text) {
+    const raw = String(text || '');
+    const phoneMatch = raw.match(/(?:\+?56[\s\d]{8,}|(?:interno|anexo)\s*\d{2,5}|\b\d{3,4}\b)/i);
+    const phone = phoneMatch ? phoneMatch[0].replace(/\s{2,}/g, ' ').trim() : 'Conserjería / interno 100';
+    return `<div class="chat-human-card" role="group" aria-label="Solicitud de atención humana">
+      <div class="chat-human-hero">
+        <div class="chat-human-avatar" aria-hidden="true">👥</div>
+        <div>
+          <div class="chat-human-kicker">Atención humana</div>
+          <div class="chat-human-title">Ya avisé al equipo de administración</div>
+          <div class="chat-human-sub">Un integrante del edificio podrá revisar tu caso. Mientras tanto, puedo dejarlo registrado como solicitud.</div>
+        </div>
+      </div>
+      <div class="chat-human-body">
+        <div class="chat-human-steps">
+          <div class="chat-human-step">
+            <div class="chat-human-step-icon" aria-hidden="true">🔔</div>
+            <div><strong>Aviso enviado</strong><span>Tu solicitud de contacto quedó marcada para administración.</span></div>
+          </div>
+          <div class="chat-human-step">
+            <div class="chat-human-step-icon" aria-hidden="true">📝</div>
+            <div><strong>Déjalo registrado</strong><span>Crear una solicitud ayuda a hacer seguimiento y mantener historial.</span></div>
+          </div>
+        </div>
+        <div class="chat-human-phone">
+          <div class="chat-human-phone-icon" aria-hidden="true">📞</div>
+          <div><small>Contacto directo</small><strong>${escapeHtml(phone)}</strong></div>
+        </div>
+        <div class="chat-human-note">Si es una urgencia, contacta directamente a conserjería. Para temas no urgentes, crea una solicitud y el equipo la revisará.</div>
+      </div>
+    </div>`;
   },
   /** Agrega mensaje del usuario */
   addUserMessage(text) {
@@ -8031,6 +8089,7 @@ const ChatModule = {
     const conv = this.getCurrent(); if (!conv) return null;
     const msg = { id: DatabaseModule.uid('msg'), type:'bot', text, time: Date.now(), actions };
     if (extra?.topicsMenu) msg.topicsMenu = true;
+    if (extra?.humanEscalation || extra?.intent === 'escalate') msg.humanEscalation = true;
     if (extra?.topicSuggestions?.length) msg.topicSuggestions = extra.topicSuggestions;
     if (extra?.ticketStatusHtml) {
       msg.ticketStatus = true;
@@ -8239,6 +8298,7 @@ const ChatModule = {
       source: result.analytics?.source,
       topicTitle: result.analytics?.topicTitle,
       intent: result.analytics?.intent,
+      humanEscalation: !!result.humanEscalation,
       analytics: result.analytics,
       skipAnalytics: result.analytics?.trackable === false
     });
@@ -8289,7 +8349,10 @@ const ChatModule = {
   },
   /** Escala a humano desde botón del chat */
   escalateFromChat() {
-    this.addBotMessage(getChatMsg('escalate'));
+    this.addBotMessage(getChatMsg('escalate'), [
+      { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' },
+      { label: 'Ver temas frecuentes', icon: 'topics', fn: 'ChatModule.showTopicsMenu()' }
+    ], { humanEscalation: true, intent: 'escalate', skipAnalytics: true });
     ArturitoModule.onAnswerFound();
   }
 };
