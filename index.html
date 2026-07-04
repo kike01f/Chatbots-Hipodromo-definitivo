@@ -11896,36 +11896,22 @@ const NavModule = {
 };
 
 
-/** Registra Service Worker embebido (PWA monolítica) */
+/** Limpia service workers antiguos: GitHub Pages sirve mejor esta app monolítica sin SW embebido. */
 function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
-  var swCode = [
-    "const CACHE_NAME='arturito-ai-v21-email-chat-url';",
-    "self.addEventListener('install',function(e){",
-    "var SCOPE=self.registration.scope;",
-    "var OFFLINE=[",
-    "'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap',",
-    "'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'];",
-    "e.waitUntil(caches.open(CACHE_NAME).then(function(c){return c.addAll(OFFLINE.filter(Boolean));}).catch(function(){}));",
-    "self.skipWaiting();});",
-    "self.addEventListener('activate',function(e){",
-    "e.waitUntil(caches.keys().then(function(k){return Promise.all(k.filter(function(x){return x!==CACHE_NAME;}).map(function(x){return caches.delete(x);}));}));",
-    "self.clients.claim();});",
-    "self.addEventListener('fetch',function(e){",
-    "if(e.request.method!=='GET')return;",
-    "var u=new URL(e.request.url);",
-    "if(u.origin.indexOf('googleapis.com')>-1||u.origin.indexOf('gstatic.com')>-1||u.origin.indexOf('cdnjs.cloudflare.com')>-1){",
-    "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));return;}",
-    "var scope=self.registration.scope;",
-    "var isAppShell=e.request.mode==='navigate'||/index\\.html$/i.test(u.pathname)||u.pathname===scope.replace(/\\/$/,'')||u.pathname===scope;",
-    "if(isAppShell){",
-    "e.respondWith(fetch(e.request).then(function(r){if(!r||r.status!==200)return r;return caches.open(CACHE_NAME).then(function(c){c.put(e.request,r.clone());return r;});}).catch(function(){return caches.match(e.request);}));return;}",
-    "e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));",
-    "});"
-  ].join('');
-  var blob = new Blob([swCode], { type: 'application/javascript' });
-  navigator.serviceWorker.register(URL.createObjectURL(blob), { scope: scope }).catch(function(){});
+  var scopeUrl = new URL(scope, location.origin).href;
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(reg) {
+      if (reg.scope.indexOf(scopeUrl) === 0 || scopeUrl.indexOf(reg.scope) === 0) reg.unregister();
+    });
+  }).catch(function(){});
+  if ('caches' in window) {
+    caches.keys().then(function(keys) {
+      keys.filter(function(key) { return key.indexOf('arturito-ai-') === 0; })
+        .forEach(function(key) { caches.delete(key); });
+    }).catch(function(){});
+  }
 }
 
 /* ─── App — Orquestador principal ─── */
