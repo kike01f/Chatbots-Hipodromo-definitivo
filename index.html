@@ -432,7 +432,8 @@ body.mode-client #adminApp{display:none!important}
 .chat-msg-actions-btns button:hover{background:rgba(127,186,2,.2)}
 .chat-human-card{overflow:hidden;border:1px solid rgba(127,186,2,.22);border-radius:18px;background:linear-gradient(180deg,#fff 0%,#f7fbea 100%);box-shadow:0 12px 30px rgba(15,23,42,.08);margin:-.1rem -.15rem .2rem;color:#1f2937}
 .chat-human-hero{display:flex;align-items:center;gap:.75rem;padding:.9rem .95rem;background:linear-gradient(135deg,rgba(127,186,2,.16),rgba(13,148,136,.08));border-bottom:1px solid rgba(127,186,2,.18)}
-.chat-human-avatar{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.75rem;background:#fff;box-shadow:0 8px 22px rgba(127,186,2,.18),inset 0 0 0 1px rgba(127,186,2,.18);flex-shrink:0}
+.chat-human-avatar{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--arturito-green-dark,#5a8501);box-shadow:0 8px 22px rgba(127,186,2,.18),inset 0 0 0 1px rgba(127,186,2,.18);flex-shrink:0}
+.chat-human-avatar .ui-icon{width:28px;height:28px}
 .chat-human-kicker{font-size:.68rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--arturito-green-dark,#5a8501);margin-bottom:.12rem}
 .chat-human-title{font-size:1rem;font-weight:900;line-height:1.15;color:#111827}
 .chat-human-sub{font-size:.78rem;color:#4b5563;margin-top:.18rem;line-height:1.35}
@@ -443,14 +444,19 @@ body.mode-client #adminApp{display:none!important}
 .chat-human-copy p:last-child{margin-bottom:0}
 .chat-human-steps{display:grid;gap:.45rem}
 .chat-human-step{display:flex;gap:.55rem;align-items:flex-start;padding:.55rem .6rem;border:1px solid rgba(148,163,184,.22);border-radius:14px;background:rgba(255,255,255,.78)}
-.chat-human-step-icon{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(127,186,2,.12);font-size:1rem;flex-shrink:0}
+.chat-human-step-icon{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(127,186,2,.12);color:var(--arturito-green-dark,#5a8501);flex-shrink:0}
+.chat-human-step-icon .ui-icon{width:17px;height:17px}
 .chat-human-step strong{display:block;font-size:.82rem;color:#111827;line-height:1.25}
 .chat-human-step span{display:block;font-size:.74rem;color:#6b7280;line-height:1.35;margin-top:.08rem}
 .chat-human-phone{display:flex;align-items:center;gap:.55rem;padding:.7rem .75rem;border-radius:16px;background:#111827;color:#fff;box-shadow:0 10px 24px rgba(17,24,39,.18)}
-.chat-human-phone-icon{width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.chat-human-phone-icon{width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.chat-human-phone-icon .ui-icon{width:18px;height:18px}
 .chat-human-phone small{display:block;color:rgba(255,255,255,.72);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .chat-human-phone strong{display:block;color:#fff;font-size:.95rem;letter-spacing:.01em}
 .chat-human-note{font-size:.74rem;line-height:1.4;color:#4b5563;background:rgba(127,186,2,.08);border:1px dashed rgba(127,186,2,.32);border-radius:14px;padding:.55rem .65rem}
+.chat-human-cta{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;border:none;border-radius:15px;background:linear-gradient(135deg,var(--arturito-green,#7FBA02),var(--arturito-green-dark,#5a8501));color:#fff;font-weight:900;font-size:.82rem;padding:.72rem .8rem;cursor:pointer;box-shadow:0 10px 22px rgba(127,186,2,.26);transition:transform .15s,box-shadow .15s}
+.chat-human-cta:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(127,186,2,.34)}
+.chat-human-cta .ui-icon{width:17px;height:17px}
 .chat-human-card + .topic-suggestions-wrap{margin-top:.55rem}
 .chat-msg-row.otro.human-escalation .chat-msg-bubble{padding:.45rem;background:transparent;box-shadow:none;border:none}
 .chat-msg-row.otro.human-escalation .chat-msg-author{margin:.05rem .35rem .3rem}
@@ -1217,6 +1223,21 @@ body.mode-client #adminApp{display:none!important}
               <div class="form-group full"><label>Accesos rápidos del chat <span style="font-weight:400;color:var(--text-muted)">(icono:texto — uno por línea, ej. smile:Gracias)</span></label><textarea id="ccChatShortcuts" rows="5"></textarea></div>
               <div class="form-group full"><label>Respuesta cuando no encuentra información</label><textarea id="ccFallback" rows="3"></textarea></div>
               <div class="form-group full"><label>Mensaje al escalar a humano</label><textarea id="ccEscalate" rows="2"></textarea></div>
+              <div class="form-group full" style="margin-top:.5rem;padding-top:1rem;border-top:1px dashed var(--border)">
+                <div style="font-weight:700;margin-bottom:.45rem;font-size:.92rem">Tarjeta de atención humana</div>
+                <p class="ticket-hint" style="margin:0 0 .75rem">Edita todos los textos de la tarjeta. Los iconos son SVG del sistema, no emojis.</p>
+              </div>
+              <div class="form-group"><label>Etiqueta superior</label><input type="text" id="ccHumanKicker"></div>
+              <div class="form-group"><label>Título principal</label><input type="text" id="ccHumanTitle"></div>
+              <div class="form-group full"><label>Subtítulo</label><textarea id="ccHumanSubtitle" rows="2"></textarea></div>
+              <div class="form-group"><label>Paso 1 — título</label><input type="text" id="ccHumanStep1Title"></div>
+              <div class="form-group"><label>Paso 1 — detalle</label><input type="text" id="ccHumanStep1Text"></div>
+              <div class="form-group"><label>Paso 2 — título</label><input type="text" id="ccHumanStep2Title"></div>
+              <div class="form-group"><label>Paso 2 — detalle</label><input type="text" id="ccHumanStep2Text"></div>
+              <div class="form-group"><label>Etiqueta contacto</label><input type="text" id="ccHumanContactLabel"></div>
+              <div class="form-group"><label>Contacto directo</label><input type="text" id="ccHumanContactValue" placeholder="+56 22 2619651"></div>
+              <div class="form-group full"><label>Nota inferior</label><textarea id="ccHumanNote" rows="2"></textarea></div>
+              <div class="form-group"><label>Texto botón solicitud</label><input type="text" id="ccHumanButtonLabel"></div>
               <div class="form-group full"><label>Mensaje para crear ticket</label><textarea id="ccTicketPrompt" rows="2"></textarea></div>
               <div class="form-group full"><label>Consulta de estado de ticket</label><textarea id="ccTicketStatusPrompt" rows="2" placeholder="Indica el número TK-… para ver el estado"></textarea></div>
               <div class="form-group full"><label>Sin solicitudes encontradas</label><textarea id="ccNoTickets" rows="2"></textarea></div>
@@ -4553,6 +4574,19 @@ const EMOJI_PICKER_ITEMS = [
 const DEFAULT_CHAT_MESSAGES = {
   fallback: '',
   escalate: 'Te entiendo — a veces uno necesita hablar con una persona del equipo.\n\nYa avisé a administración. También puedes llamar a conserjería al interno 100.\n\nMientras tanto, ¿te creo una solicitud para que quede registrado?',
+  humanEscalation: {
+    kicker: 'Atención humana',
+    title: 'Ya avisé al equipo de administración',
+    subtitle: 'Un integrante del edificio podrá revisar tu caso. Mientras tanto, puedo dejarlo registrado como solicitud.',
+    step1Title: 'Aviso enviado',
+    step1Text: 'Tu solicitud de contacto quedó marcada para administración.',
+    step2Title: 'Déjalo registrado',
+    step2Text: 'Crear una solicitud ayuda a hacer seguimiento y mantener historial.',
+    contactLabel: 'Contacto directo',
+    contactValue: '+56 22 2619651',
+    note: 'Si es una urgencia, contacta directamente a conserjería. Para temas no urgentes, crea una solicitud y el equipo la revisará.',
+    buttonLabel: 'Crear solicitud'
+  },
   ticketPrompt: 'Armemos tu solicitud. Completa el formulario y el equipo la revisará pronto.',
   ticketStatusPrompt: 'Para ver el estado de tu solicitud, escríbeme el **número de ticket** (ej. TK-20260617-0007). Lo recibiste al crear la solicitud.',
   noTickets: 'No encontré esa solicitud. Verifica el número (ej. TK-20260617-0007) o crea una nueva escribiendo "crear ticket".'
@@ -4690,6 +4724,11 @@ const ARTURITO_PERSONALITY = {
 function getChatMsg(key) {
   if (key === 'fallback') return ARTURITO_PERSONALITY.getFallback();
   return database.settings?.chatMessages?.[key] || DEFAULT_CHAT_MESSAGES[key] || '';
+}
+function getHumanEscalationConfig() {
+  const defaults = DEFAULT_CHAT_MESSAGES.humanEscalation || {};
+  const saved = database.settings?.chatMessages?.humanEscalation || {};
+  return { ...defaults, ...(saved && typeof saved === 'object' ? saved : {}) };
 }
 const SESSION_KEY = 'arturito_admin_session';
 const ARTURITO_SVG = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="arturitoFaceClip"><rect x="22" y="34" width="20" height="14" rx="1"/></clipPath></defs><rect x="16" y="28" width="32" height="28" rx="6" fill="#7FBA02"/><rect x="18" y="30" width="28" height="24" rx="4" fill="#8FCB1A"/><rect x="20" y="32" width="24" height="18" rx="2" fill="#1a1a1a"/><rect x="22" y="34" width="20" height="14" rx="1" fill="#2a2a2a"/><rect x="22" y="34" width="8" height="2" rx="1" fill="#fff" opacity="0.3"/><g class="blinking-eyes expression-eyes" clip-path="url(#arturitoFaceClip)"><circle cx="28" cy="40" r="2.5" fill="#7FBA02"/><circle cx="36" cy="40" r="2.5" fill="#7FBA02"/><circle cx="28.5" cy="39.5" r="1" fill="#8FCB1A"/><circle cx="36.5" cy="39.5" r="1" fill="#8FCB1A"/></g><path class="expression-mouth" d="M26 44 Q32 48 38 44" stroke="#7FBA02" stroke-width="2" stroke-linecap="round" fill="none"/><g class="waving-hand"><circle cx="50" cy="20" r="6" fill="#7FBA02" opacity="0.9"/><circle cx="50" cy="20" r="5" fill="#8FCB1A" opacity="0.7"/><path d="M46 24 L50 28 L54 24" fill="#7FBA02" opacity="0.9"/><circle cx="14" cy="18" r="4" fill="#7FBA02" opacity="0.8"/><circle cx="14" cy="18" r="3" fill="#8FCB1A" opacity="0.6"/><path d="M12 22 L14 25 L16 22" fill="#7FBA02" opacity="0.8"/></g><circle cx="24" cy="28" r="2" fill="#FFD700"/><circle cx="40" cy="28" r="2" fill="#FFD700"/><rect x="20" y="54" width="24" height="4" rx="2" fill="#5a8501"/></svg>`;
@@ -7586,7 +7625,7 @@ const ResponseEngine = {
 
     if (intent === 'escalate') {
       return this.finalizeResponse({
-        text: getChatMsg('escalate'), expression: 'happy', actions: ticketActions, humanEscalation: true,
+        text: getChatMsg('escalate'), expression: 'happy', humanEscalation: true,
         analytics: this.buildAnalytics('escalate', null, true)
       }, { ...ctxBase, query: userText });
     }
@@ -8049,35 +8088,38 @@ const ChatModule = {
   },
   humanEscalationHTML(text) {
     const raw = String(text || '');
+    const cleanRaw = raw.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
     const phoneMatch = raw.match(/(?:\+?56[\s\d]{8,}|(?:interno|anexo)\s*\d{2,5}|\b\d{3,4}\b)/i);
-    const phone = phoneMatch ? phoneMatch[0].replace(/\s{2,}/g, ' ').trim() : 'Conserjería / interno 100';
-    const editableMessage = raw.trim() ? `<div class="chat-human-copy">${formatBotText(raw)}</div>` : '';
+    const cfg = getHumanEscalationConfig();
+    const phone = String(cfg.contactValue || '').trim() || (phoneMatch ? phoneMatch[0].replace(/\s{2,}/g, ' ').trim() : 'Conserjería / interno 100');
+    const editableMessage = cleanRaw ? `<div class="chat-human-copy">${formatBotText(cleanRaw)}</div>` : '';
     return `<div class="chat-human-card" role="group" aria-label="Solicitud de atención humana">
       <div class="chat-human-hero">
-        <div class="chat-human-avatar" aria-hidden="true">👥</div>
+        <div class="chat-human-avatar" aria-hidden="true">${icon('users', 'md')}</div>
         <div>
-          <div class="chat-human-kicker">Atención humana</div>
-          <div class="chat-human-title">Ya avisé al equipo de administración</div>
-          <div class="chat-human-sub">Un integrante del edificio podrá revisar tu caso. Mientras tanto, puedo dejarlo registrado como solicitud.</div>
+          <div class="chat-human-kicker">${escapeHtml(cfg.kicker || 'Atención humana')}</div>
+          <div class="chat-human-title">${escapeHtml(cfg.title || 'Ya avisé al equipo de administración')}</div>
+          <div class="chat-human-sub">${escapeHtml(cfg.subtitle || '')}</div>
         </div>
       </div>
       <div class="chat-human-body">
         ${editableMessage}
         <div class="chat-human-steps">
           <div class="chat-human-step">
-            <div class="chat-human-step-icon" aria-hidden="true">🔔</div>
-            <div><strong>Aviso enviado</strong><span>Tu solicitud de contacto quedó marcada para administración.</span></div>
+            <div class="chat-human-step-icon" aria-hidden="true">${icon('alert', 'sm')}</div>
+            <div><strong>${escapeHtml(cfg.step1Title || '')}</strong><span>${escapeHtml(cfg.step1Text || '')}</span></div>
           </div>
           <div class="chat-human-step">
-            <div class="chat-human-step-icon" aria-hidden="true">📝</div>
-            <div><strong>Déjalo registrado</strong><span>Crear una solicitud ayuda a hacer seguimiento y mantener historial.</span></div>
+            <div class="chat-human-step-icon" aria-hidden="true">${icon('clipboard', 'sm')}</div>
+            <div><strong>${escapeHtml(cfg.step2Title || '')}</strong><span>${escapeHtml(cfg.step2Text || '')}</span></div>
           </div>
         </div>
         <div class="chat-human-phone">
-          <div class="chat-human-phone-icon" aria-hidden="true">📞</div>
-          <div><small>Contacto directo</small><strong>${escapeHtml(phone)}</strong></div>
+          <div class="chat-human-phone-icon" aria-hidden="true">${icon('phone', 'sm')}</div>
+          <div><small>${escapeHtml(cfg.contactLabel || 'Contacto directo')}</small><strong>${escapeHtml(phone)}</strong></div>
         </div>
-        <div class="chat-human-note">Si es una urgencia, contacta directamente a conserjería. Para temas no urgentes, crea una solicitud y el equipo la revisará.</div>
+        <div class="chat-human-note">${escapeHtml(cfg.note || '')}</div>
+        <button type="button" class="chat-human-cta" onclick="TicketModule.openCreateFromChat()">${icon('ticket', 'sm')} ${escapeHtml(cfg.buttonLabel || 'Crear solicitud')}</button>
       </div>
     </div>`;
   },
@@ -8354,10 +8396,7 @@ const ChatModule = {
   },
   /** Escala a humano desde botón del chat */
   escalateFromChat() {
-    this.addBotMessage(getChatMsg('escalate'), [
-      { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' },
-      { label: 'Ver temas frecuentes', icon: 'topics', fn: 'ChatModule.showTopicsMenu()' }
-    ], { humanEscalation: true, intent: 'escalate', skipAnalytics: true });
+    this.addBotMessage(getChatMsg('escalate'), null, { humanEscalation: true, intent: 'escalate', skipAnalytics: true });
     ArturitoModule.onAnswerFound();
   }
 };
@@ -10636,6 +10675,18 @@ const TrainingModule = {
     document.getElementById('ccChatShortcuts').value = formatChatShortcuts(getChatShortcuts());
     document.getElementById('ccFallback').value = cm.fallback || DEFAULT_CHAT_MESSAGES.fallback;
     document.getElementById('ccEscalate').value = cm.escalate || DEFAULT_CHAT_MESSAGES.escalate;
+    const hc = getHumanEscalationConfig();
+    document.getElementById('ccHumanKicker').value = hc.kicker || '';
+    document.getElementById('ccHumanTitle').value = hc.title || '';
+    document.getElementById('ccHumanSubtitle').value = hc.subtitle || '';
+    document.getElementById('ccHumanStep1Title').value = hc.step1Title || '';
+    document.getElementById('ccHumanStep1Text').value = hc.step1Text || '';
+    document.getElementById('ccHumanStep2Title').value = hc.step2Title || '';
+    document.getElementById('ccHumanStep2Text').value = hc.step2Text || '';
+    document.getElementById('ccHumanContactLabel').value = hc.contactLabel || '';
+    document.getElementById('ccHumanContactValue').value = hc.contactValue || '';
+    document.getElementById('ccHumanNote').value = hc.note || '';
+    document.getElementById('ccHumanButtonLabel').value = hc.buttonLabel || '';
     document.getElementById('ccTicketPrompt').value = cm.ticketPrompt || DEFAULT_CHAT_MESSAGES.ticketPrompt;
     document.getElementById('ccTicketStatusPrompt').value = cm.ticketStatusPrompt || DEFAULT_CHAT_MESSAGES.ticketStatusPrompt;
     document.getElementById('ccNoTickets').value = cm.noTickets || DEFAULT_CHAT_MESSAGES.noTickets;
@@ -10689,6 +10740,19 @@ const TrainingModule = {
     database.settings.chatMessages = {
       fallback: document.getElementById('ccFallback').value.trim(),
       escalate: document.getElementById('ccEscalate').value.trim(),
+      humanEscalation: {
+        kicker: document.getElementById('ccHumanKicker').value.trim(),
+        title: document.getElementById('ccHumanTitle').value.trim(),
+        subtitle: document.getElementById('ccHumanSubtitle').value.trim(),
+        step1Title: document.getElementById('ccHumanStep1Title').value.trim(),
+        step1Text: document.getElementById('ccHumanStep1Text').value.trim(),
+        step2Title: document.getElementById('ccHumanStep2Title').value.trim(),
+        step2Text: document.getElementById('ccHumanStep2Text').value.trim(),
+        contactLabel: document.getElementById('ccHumanContactLabel').value.trim(),
+        contactValue: document.getElementById('ccHumanContactValue').value.trim(),
+        note: document.getElementById('ccHumanNote').value.trim(),
+        buttonLabel: document.getElementById('ccHumanButtonLabel').value.trim()
+      },
       ticketPrompt: document.getElementById('ccTicketPrompt').value.trim(),
       ticketStatusPrompt: document.getElementById('ccTicketStatusPrompt').value.trim(),
       noTickets: document.getElementById('ccNoTickets').value.trim()
@@ -11402,3 +11466,4 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 </script>
 </body>
 </html>
+
