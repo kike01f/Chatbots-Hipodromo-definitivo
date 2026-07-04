@@ -773,7 +773,7 @@ body.mode-client #adminApp{display:none!important}
 .kb-sort-item-label{flex:1;font-size:.85rem;font-weight:500}
 .kb-gadget-entry-title{font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:.4rem}
 .kb-gadget-entry-meta{font-size:.72rem;color:var(--text-muted);margin-bottom:.35rem}
-.kb-gadget-entry-preview{font-size:.8rem;color:var(--text);line-height:1.4;max-height:4.2em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.kb-gadget-entry-preview{font-size:.8rem;color:var(--text);line-height:1.4;max-height:4.2em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical}
 .kb-gadget-keywords{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.45rem}
 .kb-gadget-kw{font-size:.68rem;padding:.12rem .4rem;border-radius:99px;background:color-mix(in srgb,var(--arturito-green,#7FBA02) 12%,transparent);color:var(--arturito-green-dark,#5a8501)}
 .cloud-badge{font-size:.72rem;font-weight:600;padding:.28rem .65rem;border-radius:999px;border:1px solid var(--border);white-space:nowrap}
@@ -802,28 +802,35 @@ body.mode-client #adminApp{display:none!important}
 
 /* Microinteracciones: emojis estilo WhatsApp y estrellas animadas */
 .chat-emoji-popover{
-  display:none;position:absolute;bottom:calc(100% + 10px);left:.6rem;right:.6rem;
-  max-height:min(232px,42vh);overflow-y:auto;padding:.62rem;
+  display:none;position:absolute;bottom:calc(100% + 10px);left:.5rem;right:auto;
+  width:min(430px,calc(100vw - 1.5rem));max-height:min(320px,54vh);overflow-y:auto;padding:.7rem;
   background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
   border:1px solid rgba(148,163,184,.28);border-radius:22px;flex-wrap:wrap;gap:.28rem;
   box-shadow:0 -18px 46px rgba(15,23,42,.18),0 1px 0 rgba(255,255,255,.9) inset;
   z-index:20;-webkit-overflow-scrolling:touch;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   transform-origin:bottom center
 }
-.chat-dock.chat-emoji-open .chat-emoji-popover{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));animation:emojiTrayIn .18s cubic-bezier(.2,.9,.25,1.2)}
-.chat-emoji-popover::before{
-  content:'Emojis';grid-column:1/-1;font-size:.68rem;font-weight:800;color:#64748b;
-  letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .25rem
-}
+.chat-dock.chat-emoji-open .chat-emoji-popover{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));animation:emojiTrayIn .18s cubic-bezier(.2,.9,.25,1.2)}
+.chat-emoji-popover::before{display:none}
+.emoji-picker-section,.emoji-shortcut-section{grid-column:1/-1;display:grid;gap:.3rem}
+.emoji-picker-section{grid-template-columns:repeat(10,minmax(0,1fr))}
+.emoji-shortcut-section{grid-template-columns:repeat(5,minmax(0,1fr));padding-top:.55rem;margin-top:.45rem;border-top:1px solid rgba(148,163,184,.2)}
+.emoji-picker-title{grid-column:1/-1;font-size:.68rem;font-weight:800;color:#64748b;letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .2rem}
 .chat-emoji-popover button,.emoji-btn,.ticket-response-emoji{
   position:relative;display:inline-flex;align-items:center;justify-content:center;
   border:none;background:transparent;cursor:pointer;line-height:1;user-select:none;-webkit-tap-highlight-color:transparent;
   transition:transform .16s cubic-bezier(.2,.9,.25,1.4),background .16s,box-shadow .16s,filter .16s
 }
 .chat-emoji-popover button{
-  width:34px;height:34px;padding:0;border-radius:12px;font-size:1.35rem;color:inherit;
+  width:36px;height:36px;padding:0;border-radius:12px;font-size:1.42rem;color:inherit;
   animation:emojiPop .24s cubic-bezier(.2,.9,.25,1.35) both;
   animation-delay:calc(min(var(--emoji-i,0),24) * 10ms)
+}
+.chat-emoji-popover .chat-shortcut-btn{font-size:.8rem;width:100%;min-width:0;height:36px}
+@media(max-width:420px){
+  .chat-emoji-popover{left:.45rem;width:calc(100vw - .9rem);max-height:50vh}
+  .chat-dock.chat-emoji-open .chat-emoji-popover,.emoji-picker-section{grid-template-columns:repeat(8,minmax(0,1fr))}
+  .emoji-shortcut-section{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 .chat-emoji-popover button:hover,.chat-emoji-popover button:focus-visible,
 .emoji-btn:hover,.emoji-btn:focus-visible,.ticket-response-emoji:hover,.ticket-response-emoji:focus-visible{
@@ -4629,6 +4636,14 @@ const DEFAULT_CHAT_SHORTCUTS = [
   { icon: 'alert', text: 'Es urgente' },
   { icon: 'phone', text: 'Necesito contactar a conserjería' }
 ];
+const EMOJI_PICKER_ITEMS = [
+  '😀','😃','😄','😁','😊','🙂','😉','😍','🥰','😘',
+  '😅','😂','🤣','😢','😭','😟','😕','😐','😮','😡',
+  '👍','👎','👌','👏','🙏','💪','👋','🤝','🙌','✌️',
+  '✅','☑️','❌','⚠️','🚨','📌','📍','📎','📝','📄',
+  '🏠','🏢','🚗','🔑','🛠️','🔧','💡','💧','🔥','🧹',
+  '📞','📱','✉️','📦','🕒','📅','💬','❓','⭐','❤️'
+];
 const DEFAULT_CHAT_MESSAGES = {
   fallback: '',
   escalate: 'Te entiendo — a veces uno necesita hablar con una persona del equipo.\n\nYa avisé a administración. También puedes llamar a conserjería al interno 100.\n\nMientras tanto, ¿te creo una solicitud para que quede registrado?',
@@ -7973,16 +7988,20 @@ const ChatModule = {
   renderChatShortcuts() {
     const bar = document.getElementById('emojiBar');
     if (!bar) return;
-    bar.innerHTML = getChatShortcuts().map((s, index) =>
-      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" aria-label="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}" style="--emoji-i:${index}">${icon(s.icon, 'md')}</button>`
+    const emojiButtons = EMOJI_PICKER_ITEMS.map((emoji, index) =>
+      `<button type="button" class="emoji-picker-btn" title="${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}" data-emoji="${escapeHtml(emoji)}" style="--emoji-i:${index}">${escapeHtml(emoji)}</button>`
     ).join('');
+    const shortcutButtons = getChatShortcuts().map((s, index) =>
+      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" aria-label="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}" style="--emoji-i:${index + EMOJI_PICKER_ITEMS.length}">${icon(s.icon, 'md')}</button>`
+    ).join('');
+    bar.innerHTML = `<div class="emoji-picker-section"><div class="emoji-picker-title">Emojis</div>${emojiButtons}</div><div class="emoji-shortcut-section"><div class="emoji-picker-title">Accesos rápidos</div>${shortcutButtons}</div>`;
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
       bar.addEventListener('click', e => {
-        const btn = e.target.closest('button[data-text]');
+        const btn = e.target.closest('button[data-text],button[data-emoji]');
         if (!btn) return;
         const input = document.getElementById('chatInput');
-        const insert = btn.dataset.text + ' ';
+        const insert = btn.dataset.emoji ? `${btn.dataset.emoji} ` : `${btn.dataset.text} `;
         input.value = input.value ? input.value.trimEnd() + ' ' + insert : insert;
         input.focus();
       });
