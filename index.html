@@ -838,8 +838,18 @@ body.mode-client #adminApp{display:none!important}
   background:rgba(127,186,2,.12);box-shadow:0 8px 18px rgba(15,23,42,.12);filter:saturate(1.14);outline:none
 }
 .chat-emoji-popover button:active,.emoji-btn:active,.ticket-response-emoji:active{transform:scale(.88);animation:emojiBounce .32s ease}
-.ticket-response-emoji-row{padding:.45rem;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(148,163,184,.22);box-shadow:0 8px 24px rgba(15,23,42,.06) inset}
-.ticket-response-emoji{min-width:34px;height:34px;font-size:1.18rem;padding:0;border-radius:12px;background:#fff;border:1px solid rgba(148,163,184,.18)}
+.ticket-response-emoji-row{
+  display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.3rem;
+  max-height:168px;overflow-y:auto;padding:.62rem;border-radius:18px;
+  background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(148,163,184,.22);
+  box-shadow:0 8px 24px rgba(15,23,42,.06) inset;-webkit-overflow-scrolling:touch
+}
+.ticket-response-emoji-row::before{
+  content:'Emojis para la respuesta';grid-column:1/-1;font-size:.68rem;font-weight:800;
+  color:#64748b;letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .2rem
+}
+.ticket-response-emoji{width:36px;height:36px;font-size:1.32rem;padding:0;border-radius:12px;background:#fff;border:1px solid rgba(148,163,184,.18)}
+@media(max-width:520px){.ticket-response-emoji-row{grid-template-columns:repeat(8,minmax(0,1fr));max-height:150px}}
 .chat-rating-prompt{
   position:relative;overflow:hidden;margin-top:.55rem;padding:.72rem .78rem;
   background:linear-gradient(135deg,rgba(255,251,235,.96),rgba(240,253,244,.94));
@@ -1404,7 +1414,13 @@ body.mode-client #adminApp{display:none!important}
     <div class="ticket-manage-compose">
       <div class="form-grid" style="gap:.65rem">
         <div class="form-group"><label>Estado del requerimiento</label><select id="tmEstado"></select></div>
-        <div class="form-group full"><label>Respuesta / comentario al residente</label><textarea id="tmMensaje" rows="3" placeholder="Escribe la actualización que verá el residente al consultar su ticket…"></textarea></div>
+        <div class="form-group full">
+          <label>Respuesta / comentario al residente</label>
+          <textarea id="tmMensaje" rows="3" placeholder="Escribe la actualización que verá el residente al consultar su ticket…"></textarea>
+          <div class="ticket-response-tools" aria-label="Herramientas rápidas de respuesta">
+            <div class="ticket-response-emoji-row" id="tmEmojiRow"></div>
+          </div>
+        </div>
         <div class="form-group full">
           <label>Adjuntar documentación <span class="ticket-hint">(opcional)</span></label>
           <div class="ticket-attach-zone">
@@ -9607,6 +9623,11 @@ const TicketManageModule = {
 
   init() {
     document.getElementById('btnTicketManageSubmit')?.addEventListener('click', () => void this.submit());
+    this.renderResponseTools();
+    document.getElementById('tmEmojiRow')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-tm-emoji]');
+      if (btn) this.insertMessageText(btn.dataset.tmEmoji || '');
+    });
     document.getElementById('btnManageAttach')?.addEventListener('click', () => document.getElementById('tmFileInput')?.click());
     document.getElementById('tmFileInput')?.addEventListener('change', (e) => {
       this.handleAddFiles(Array.from(e.target.files || []));
@@ -9623,6 +9644,28 @@ const TicketManageModule = {
     document.getElementById('tmCanalEmail')?.addEventListener('change', () => this._updateCanalHint(this._currentTicket));
     const estadoSel = document.getElementById('tmEstado');
     if (estadoSel) estadoSel.innerHTML = STATUSES.map((s) => `<option value="${s}">${s}</option>`).join('');
+  },
+
+  renderResponseTools() {
+    const emojiRow = document.getElementById('tmEmojiRow');
+    if (!emojiRow) return;
+    const emojis = typeof EMOJI_PICKER_ITEMS !== 'undefined' ? EMOJI_PICKER_ITEMS : ['✅','👋','🙏','🔎','🛠️','📎','⏳','📌','🚨','😊'];
+    emojiRow.innerHTML = emojis.map((emoji, index) =>
+      `<button type="button" class="ticket-response-emoji" data-tm-emoji="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}" style="--emoji-i:${index}">${escapeHtml(emoji)}</button>`
+    ).join('');
+  },
+
+  insertMessageText(text) {
+    const textarea = document.getElementById('tmMensaje');
+    if (!textarea || !text) return;
+    const current = textarea.value || '';
+    const start = textarea.selectionStart ?? current.length;
+    const end = textarea.selectionEnd ?? start;
+    const suffix = ' ';
+    textarea.value = current.slice(0, start) + text + suffix + current.slice(end);
+    const pos = start + text.length + suffix.length;
+    textarea.focus();
+    textarea.setSelectionRange(pos, pos);
   },
 
   handleAddFiles(files) {
