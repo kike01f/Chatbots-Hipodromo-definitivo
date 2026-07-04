@@ -844,6 +844,15 @@ body.mode-client #adminApp{display:none!important}
   background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(148,163,184,.22);
   box-shadow:0 8px 24px rgba(15,23,42,.06) inset;-webkit-overflow-scrolling:touch
 }
+.ticket-response-emoji-toggle{
+  align-self:flex-start;display:inline-flex;align-items:center;gap:.35rem;border:1px solid rgba(127,186,2,.32);
+  background:rgba(127,186,2,.08);color:var(--arturito-green-dark,#5a8501);border-radius:999px;
+  padding:.38rem .7rem;font-size:.78rem;font-weight:800;cursor:pointer;transition:background .16s,transform .16s,border-color .16s
+}
+.ticket-response-emoji-toggle:hover{background:rgba(127,186,2,.16);border-color:rgba(127,186,2,.48);transform:translateY(-1px)}
+.ticket-response-emoji-toggle[aria-expanded="true"]{background:rgba(127,186,2,.2);border-color:var(--arturito-green,#7FBA02)}
+.ticket-response-emoji-row.collapsed{display:none}
+.ticket-response-emoji-row:not(.collapsed){animation:emojiTrayIn .18s cubic-bezier(.2,.9,.25,1.2)}
 .ticket-response-emoji-row::before{
   content:'Emojis para la respuesta';grid-column:1/-1;font-size:.68rem;font-weight:800;
   color:#64748b;letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .2rem
@@ -1418,7 +1427,8 @@ body.mode-client #adminApp{display:none!important}
           <label>Respuesta / comentario al residente</label>
           <textarea id="tmMensaje" rows="3" placeholder="Escribe la actualización que verá el residente al consultar su ticket…"></textarea>
           <div class="ticket-response-tools" aria-label="Herramientas rápidas de respuesta">
-            <div class="ticket-response-emoji-row" id="tmEmojiRow"></div>
+            <button type="button" class="ticket-response-emoji-toggle" id="tmEmojiToggle" aria-expanded="false" aria-controls="tmEmojiRow">😊 Emojis</button>
+            <div class="ticket-response-emoji-row collapsed" id="tmEmojiRow"></div>
           </div>
         </div>
         <div class="form-group full">
@@ -8790,6 +8800,18 @@ const TicketEmailDebug = {
     const statusUrl = this.buildTicketStatusUrl(ticketId, s);
     const esc = (v) => this._escapeHtml(v);
     const estadoCambio = estado && estado !== estadoAnterior;
+    const positiveClose = ['Resuelto', 'Cerrado'].includes(String(estado || ticket.estado || ''));
+    const satisfactionIcon = positiveClose ? `<div style="margin:0 0 18px;padding:16px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:12px;text-align:center">
+      <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Satisfacción" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 8px">
+        <circle cx="32" cy="32" r="30" fill="#dcfce7"/>
+        <path d="M18 35l8-8 9 9-8 8a5.5 5.5 0 0 1-7.8 0L18 42a5 5 0 0 1 0-7z" fill="#ffffff" stroke="${esc(primary)}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M46 35l-8-8-9 9 8 8a5.5 5.5 0 0 0 7.8 0L46 42a5 5 0 0 0 0-7z" fill="#ffffff" stroke="${esc(primary)}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M26 27l5-5a4 4 0 0 1 5.7 0l1.3 1.3M29 36l6-6M33 40l5-5" stroke="${esc(primary)}" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M22 45h20" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="font-size:15px;font-weight:700;color:#166534">Solicitud cerrada satisfactoriamente</div>
+      <div style="font-size:13px;color:#3f6212;margin-top:4px">Gracias por confiar en nuestro equipo.</div>
+    </div>` : '';
     const attList = (adjuntos || []).map((a) => ({
       name: a.name || a.nombre || 'adjunto',
       url: a.url || ''
@@ -8806,6 +8828,7 @@ const TicketEmailDebug = {
         <p style="margin:6px 0 0;opacity:.92">Actualización de tu solicitud</p>
       </div>
       <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;background:#fff">
+        ${satisfactionIcon}
         <p style="margin:0 0 16px">Hola <strong>${esc(ticket.nombre || 'residente')}</strong>, el equipo de administración respondió tu solicitud <strong>${esc(ticketId)}</strong>.</p>
         ${estadoCambio ? `<p style="margin:0 0 12px"><strong>Estado:</strong> ${esc(estadoAnterior || '—')} → <strong>${esc(estado)}</strong></p>` : `<p style="margin:0 0 12px"><strong>Estado actual:</strong> ${esc(estado || ticket.estado || '—')}</p>`}
         <div style="background:#f8fafc;border-left:4px solid ${esc(primary)};padding:12px 14px;border-radius:0 8px 8px 0;margin-bottom:16px">
@@ -9624,6 +9647,13 @@ const TicketManageModule = {
   init() {
     document.getElementById('btnTicketManageSubmit')?.addEventListener('click', () => void this.submit());
     this.renderResponseTools();
+    document.getElementById('tmEmojiToggle')?.addEventListener('click', () => {
+      const row = document.getElementById('tmEmojiRow');
+      const toggle = document.getElementById('tmEmojiToggle');
+      if (!row || !toggle) return;
+      const open = row.classList.toggle('collapsed') === false;
+      toggle.setAttribute('aria-expanded', String(open));
+    });
     document.getElementById('tmEmojiRow')?.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-tm-emoji]');
       if (btn) this.insertMessageText(btn.dataset.tmEmoji || '');
@@ -9738,6 +9768,8 @@ const TicketManageModule = {
     this._pendingFiles = [];
     this.renderPendingFiles();
     document.getElementById('tmMensaje').value = '';
+    document.getElementById('tmEmojiRow')?.classList.add('collapsed');
+    document.getElementById('tmEmojiToggle')?.setAttribute('aria-expanded', 'false');
     const chatCb = document.getElementById('tmCanalChat');
     const emailCb = document.getElementById('tmCanalEmail');
     if (chatCb) chatCb.checked = true;
