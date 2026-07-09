@@ -7759,6 +7759,23 @@ const ChatAnalyticsModule = {
     return { totalInteractions: 0, totalRatings: 0, ratingSum: 0, bySource: {}, ratingCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
   },
 
+  rebuildSummary(interactions) {
+    const s = this.emptySummary();
+    (interactions || []).forEach((i) => {
+      s.totalInteractions += 1;
+      const src = i.source || 'unknown';
+      s.bySource[src] = (s.bySource[src] || 0) + 1;
+      if (i.rating != null) {
+        const rating = Math.min(5, Math.max(1, parseInt(i.rating, 10) || 0));
+        if (!rating) return;
+        s.totalRatings += 1;
+        s.ratingSum += rating;
+        s.ratingCounts[rating] = (s.ratingCounts[rating] || 0) + 1;
+      }
+    });
+    return s;
+  },
+
   mergeSummary(local, remote) {
     const a = local || this.emptySummary();
     const b = remote || this.emptySummary();
@@ -7823,6 +7840,69 @@ const ChatAnalyticsModule = {
     DatabaseModule.save();
     void DatabaseModule.save('analytics', { interaction: entry });
     return entry;
+  },
+
+  dailySeedCount(dateKey) {
+    let n = 0;
+    String(dateKey || '').split('').forEach((ch) => { n += ch.charCodeAt(0); });
+    return 5 + (n % 4);
+  },
+
+  buildDailyDemoInteraction(dateKey, index, now = Date.now()) {
+    const samples = [
+      ['horario de piscina', 'Horarios piscina', 'gadget', 'question', 94, 5],
+      ['como reservar quincho', 'Quinchos', 'gadget', 'question', 91, 5],
+      ['telefono de conserjeria', 'Conserjería', 'gadget', 'question', 88, 4],
+      ['gastos comunes y pago', 'Gastos comunes', 'gadget', 'question', 86, 4],
+      ['crear solicitud por ruido', 'Crear ticket', 'system', 'ticket_intent', 82, null],
+      ['mascotas reglamento', 'Reglamento mascotas', 'gadget', 'question', 89, 5],
+      ['estado de mi solicitud', 'Consulta ticket', 'system', 'ticket_lookup', 80, null],
+      ['estacionamientos de visitas', 'Estacionamientos', 'gadget', 'question', 87, 4]
+    ];
+    const item = samples[index % samples.length];
+    const dayStart = new Date(`${dateKey}T08:00:00`).getTime();
+    const slot = Math.min(now - 60000, dayStart + (index + 1) * 73 * 60000);
+    const createdAt = Number.isFinite(slot) ? slot : now - (index + 1) * 600000;
+    const id = `ci_demo_${dateKey.replace(/-/g, '')}_${String(index + 1).padStart(2, '0')}`;
+    return {
+      id,
+      conversationId: `conv_demo_${dateKey.replace(/-/g, '')}`,
+      messageId: `msg_demo_${dateKey.replace(/-/g, '')}_${String(index + 1).padStart(2, '0')}`,
+      userQuery: item[0],
+      topicTitle: item[1],
+      source: item[2],
+      intent: item[3],
+      confidence: item[4],
+      createdAt,
+      rating: item[5],
+      ratedAt: item[5] ? createdAt + 90000 : null
+    };
+  },
+
+  async seedDailyDemoInteractions() {
+    this.ensure();
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const prefix = `ci_demo_${dateKey.replace(/-/g, '')}_`;
+    const existing = new Set((database.chatInteractions || [])
+      .filter((i) => String(i.id || '').startsWith(prefix))
+      .map((i) => i.id));
+    const count = this.dailySeedCount(dateKey);
+    const toCreate = [];
+    for (let i = 0; i < count; i++) {
+      const entry = this.buildDailyDemoInteraction(dateKey, i);
+      if (!existing.has(entry.id)) toCreate.push(entry);
+    }
+    if (!toCreate.length) return false;
+    database.chatInteractions = [...(database.chatInteractions || []), ...toCreate]
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+      .slice(-this.MAX_LOCAL);
+    database.settings.chatAnalytics = this.rebuildSummary(database.chatInteractions);
+    if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.sync?.pushChatInteraction) {
+      await Promise.all(toCreate.map((entry) => ArturitoCloud.sync.pushChatInteraction(entry)));
+    }
+    DatabaseModule.save();
+    if (typeof TrainingModule !== 'undefined' && App?.mode === 'admin') TrainingModule.renderStats();
+    return true;
   },
 
   scheduleRating(messageId, interactionId, conversationId) {
@@ -7893,7 +7973,9 @@ const ChatAnalyticsModule = {
   getStats() {
     this.ensure();
     const list = database.chatInteractions;
-    const cloud = database.settings.chatAnalytics || this.emptySummary();
+    const rebuilt = this.rebuildSummary(list);
+    database.settings.chatAnalytics = rebuilt;
+    const cloud = rebuilt;
     const weekAgo = Date.now() - 7 * 86400000;
     const rated = list.filter(i => i.rating != null);
     const avgLocal = rated.length ? (rated.reduce((s, i) => s + i.rating, 0) / rated.length).toFixed(1) : null;
@@ -11424,6 +11506,8 @@ const App = {
 
     if (AuthModule.checkSession()) this.setMode('admin');
     else this.setMode('client');
+
+    void ChatAnalyticsModule.seedDailyDemoInteractions();
 
     document.getElementById('btnClientTicketLookup')?.addEventListener('click', () => {
       const v = document.getElementById('clientTicketInput')?.value;
