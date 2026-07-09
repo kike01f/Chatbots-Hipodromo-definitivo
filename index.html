@@ -1297,6 +1297,7 @@ body.mode-client #adminApp{display:none!important}
           <div class="card chart-card" style="grid-column:1/-1"><div class="card-title" style="margin-bottom:.75rem">Evolución Mensual</div><canvas id="chartMonthly" style="height:280px!important"></canvas></div>
           <div class="card chart-card"><div class="card-title" style="margin-bottom:.75rem">Rendimiento Chatbot (confianza)</div><canvas id="chartChatbot"></canvas></div>
           <div class="card chart-card"><div class="card-title" style="margin-bottom:.75rem">Calidad de respuestas (1-5 ★)</div><canvas id="chartChatRatings"></canvas></div>
+          <div class="card chart-card" style="grid-column:1/-1"><div class="card-title" style="margin-bottom:.75rem">Interacciones por día: consultas IA vs tickets de atención humana</div><canvas id="chartDailyAiHuman" style="height:280px!important"></canvas></div>
           <div class="card chart-card"><div class="card-title" style="margin-bottom:.75rem">Uso de la plataforma</div><canvas id="chartUsage"></canvas></div>
         </div>
       </section>
@@ -3269,6 +3270,10 @@ const ARTURITO_GADGET_KB_SEED = [
         : 0;
       const avgHours = avgMs ? Math.round(avgMs / 3600000) : 0;
       const docs = database.trainingDocs || database.documents || [];
+      const aiConversationIds = new Set();
+      (database.conversations || []).forEach((c) => { if (c?.id) aiConversationIds.add(c.id); });
+      (database.chatInteractions || []).forEach((i) => { if (i?.conversationId) aiConversationIds.add(i.conversationId); });
+      (chatSessions || []).forEach((s) => { if (s?.id) aiConversationIds.add(s.id); });
       return {
         totalTickets: t.length,
         openTickets: open.length,
@@ -3276,7 +3281,7 @@ const ARTURITO_GADGET_KB_SEED = [
         criticalTickets: critical.length,
         avgResponseHours: avgHours,
         activeUsers: (database.users || []).filter((u) => u.activo !== false).length,
-        aiConversations: (database.conversations || []).length + chatSessions.length,
+        aiConversations: aiConversationIds.size,
         trainedDocuments: docs.length || (database.knowledge || []).length,
         satisfaction: database.settings?.satisfactionScore || 92
       };
@@ -3619,6 +3624,35 @@ const ARTURITO_GADGET_KB_SEED = [
       }, { merge: true });
     }
 
+    async pushConversation(conv) {
+      if (!this.fb.isEnabled() || !conv?.id) return;
+      const { setDoc, doc } = this.fb._modules;
+      const messages = Array.isArray(conv.messages) ? conv.messages.slice(-100) : [];
+      await setDoc(doc(this.fb.col('conversations'), conv.id), {
+        id: conv.id,
+        title: String(conv.title || 'Nueva conversación').slice(0, 120),
+        messages: JSON.parse(JSON.stringify(messages)),
+        createdAt: conv.createdAt || Date.now(),
+        updatedAt: conv.updatedAt || Date.now()
+      }, { merge: true });
+    }
+
+    async pullConversations(database, forceServer = true) {
+      if (!this.fb.isEnabled()) return false;
+      const { getDocs, getDocsFromServer } = this.fb._modules;
+      let snap = null;
+      if (forceServer && getDocsFromServer) {
+        try { snap = await getDocsFromServer(this.fb.col('conversations')); } catch (_) {}
+      }
+      if (!snap) snap = await getDocs(this.fb.col('conversations'));
+      const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+        .slice(0, 200);
+      if (JSON.stringify(remote) === JSON.stringify(database.conversations || [])) return false;
+      database.conversations = remote;
+      return true;
+    }
+
     async pullChatInteractions(database, forceServer = true) {
       if (!this.fb.isEnabled()) return false;
       const { getDocs, getDocsFromServer } = this.fb._modules;
@@ -3639,9 +3673,9 @@ const ARTURITO_GADGET_KB_SEED = [
 
     /** Descarga KB y settings públicos desde el servidor (sin caché) */
     async pullPublicCloudData(database, forceServer = true) {
-      if (!this.fb.isEnabled()) return { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false };
+      if (!this.fb.isEnabled()) return { settings: false, gadgetKB: false, knowledge: false, analytics: false, conversations: false, training: false };
       const { getDoc, getDocFromServer, getDocs, getDocsFromServer } = this.fb._modules;
-      const changes = { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false };
+      const changes = { settings: false, gadgetKB: false, knowledge: false, analytics: false, conversations: false, training: false };
       const settingsRef = this.fb.doc(`condominios/${this._cid()}/settings/main`);
       try {
         let settingsSnap = null;
@@ -3689,6 +3723,7 @@ const ARTURITO_GADGET_KB_SEED = [
           this.applyUnifiedKnowledge(database);
         }
         if (await this.pullChatInteractions(database, forceServer)) changes.analytics = true;
+        if (await this.pullConversations(database, forceServer)) changes.conversations = true;
         if (await this.pullTrainingData(forceServer)) changes.training = true;
       } catch (err) {
         console.warn('[CloudSync] pullPublicCloudData:', err);
@@ -4169,6 +4204,20 @@ const ARTURITO_GADGET_KB_SEED = [
       );
       this._unsubs.push(analyticsUnsub);
 
+      const conversationsUnsub = onSnapshot(
+        this.fb.col('conversations'),
+        (snap) => {
+          const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+            .slice(0, 200);
+          if (JSON.stringify(remote) === JSON.stringify(database.conversations || [])) return;
+          database.conversations = remote;
+          if (onUpdate) onUpdate('conversations');
+        },
+        this._snapErr('conversations')
+      );
+      this._unsubs.push(conversationsUnsub);
+
       const trainingDocsUnsub = onSnapshot(
         this.fb.col('training_documents'),
         async (snap) => {
@@ -4384,6 +4433,7 @@ const ARTURITO_GADGET_KB_SEED = [
       if (changes.gadgetKB && onSync) { onSync('gadgetKB'); synced = true; }
       if (changes.knowledge && onSync) { onSync('knowledge'); synced = true; }
       if (changes.analytics && onSync) { onSync('analytics'); synced = true; }
+      if (changes.conversations && onSync) { onSync('conversations'); synced = true; }
       if (changes.training && onSync) { onSync('training'); synced = true; }
       return synced;
     }
@@ -7954,6 +8004,7 @@ const ChatAnalyticsModule = {
     this.cancelRating(messageId);
     DatabaseModule.save();
     void DatabaseModule.save('analytics', { interaction: entry });
+    if (typeof ChatModule !== 'undefined') ChatModule.persistConversation();
     if (typeof TrainingModule !== 'undefined' && App?.mode === 'admin') TrainingModule.renderStats();
     ChatModule.renderMessages('bot-start');
     toast('¡Gracias por evaluar la respuesta!', 'success');
@@ -7966,6 +8017,7 @@ const ChatAnalyticsModule = {
     });
     this.cancelRating(messageId);
     DatabaseModule.save();
+    if (typeof ChatModule !== 'undefined') ChatModule.persistConversation();
     ChatModule.renderMessages('bot-start');
   },
 
@@ -8070,6 +8122,7 @@ const ChatModule = {
     database.conversations.unshift(conv);
     currentConversationId = conv.id;
     DatabaseModule.save();
+    this.persistConversation(conv);
     this.renderHistory();
     this.renderMessages();
     const greeting = database.settings.welcomeMessage?.trim() || ARTURITO_PERSONALITY.getGreeting();
@@ -8083,6 +8136,10 @@ const ChatModule = {
   },
   /** Obtiene conversación activa */
   getCurrent() { return database.conversations.find(c => c.id === currentConversationId); },
+  persistConversation(conv = this.getCurrent()) {
+    if (!conv?.id || typeof ArturitoCloud === 'undefined' || !ArturitoCloud.sync?.pushConversation) return;
+    void ArturitoCloud.sync.pushConversation(conv).catch((err) => console.warn('[Chat] persistConversation:', err));
+  },
   /** Renderiza historial de conversaciones */
   renderHistory(filter = '') {
     const list = document.getElementById('chatHistoryList');
@@ -8210,7 +8267,7 @@ const ChatModule = {
     conv.messages.push({ type:'user', text, time: Date.now() });
     if (conv.messages.filter(m=>m.type==='user').length === 1) conv.title = text.substring(0,40);
     conv.updatedAt = Date.now();
-    DatabaseModule.save(); this.renderMessages('end'); this.renderHistory();
+    DatabaseModule.save(); this.persistConversation(conv); this.renderMessages('end'); this.renderHistory();
   },
   /** Agrega mensaje del bot */
   addBotMessage(text, actions, extra) {
@@ -8240,6 +8297,7 @@ const ChatModule = {
       ChatAnalyticsModule.scheduleRating(msg.id, entry.id, conv.id);
     }
     DatabaseModule.save();
+    this.persistConversation(conv);
     this.renderMessages('bot-start');
     return msg;
   },
@@ -8248,7 +8306,7 @@ const ChatModule = {
     const conv = this.getCurrent(); if (!conv) return;
     conv.messages.push({ type:'bot', text: intro || getTopicsMenuIntro(), topicsMenu: true, time: Date.now() });
     conv.updatedAt = Date.now();
-    DatabaseModule.save(); this.renderMessages('bot-start');
+    DatabaseModule.save(); this.persistConversation(conv); this.renderMessages('bot-start');
   },
   /** Muestra el menú completo de temas en el chat */
   showTopicsMenu() {
@@ -11136,6 +11194,32 @@ const ReportModule = {
         options: { ...opts, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
       });
     }
+    const dailyAiHuman = this.dailyAiHumanData(14);
+    const dailyCanvas = document.getElementById('chartDailyAiHuman');
+    if (dailyCanvas) {
+      this._charts.dailyAiHuman = new Chart(dailyCanvas, {
+        type: 'bar',
+        data: {
+          labels: dailyAiHuman.labels,
+          datasets: [
+            { label: 'IA', data: dailyAiHuman.ai, backgroundColor: '#0d9488', stack: 'interacciones' },
+            { label: 'Humana', data: dailyAiHuman.human, backgroundColor: '#f59e0b', stack: 'interacciones' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: { mode: 'index', intersect: false }
+          },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
     const usage = this.platformUsageData();
     this._charts.usage = new Chart(document.getElementById('chartUsage'), {
       type: 'radar',
@@ -11170,6 +11254,46 @@ const ReportModule = {
     return {
       labels: ['1 ★', '2 ★', '3 ★', '4 ★', '5 ★'],
       values: [1, 2, 3, 4, 5].map(n => counts[n] || 0)
+    };
+  },
+  isKnowledgeAiInteraction(i) {
+    const intent = String(i?.intent || '').toLowerCase();
+    const source = String(i?.source || '').toLowerCase();
+    return ['gadget', 'manual', 'document'].includes(source)
+      && !/(fallback|no_answer|ticket|human|humano|escalate|escalar)/.test(intent);
+  },
+  dayKey(ts) {
+    const d = new Date(ts || Date.now());
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+  dayLabel(key) {
+    const [, m, d] = String(key).split('-');
+    return `${d}/${m}`;
+  },
+  dailyAiHumanData(days = 14) {
+    const labels = [];
+    const buckets = {};
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const key = this.dayKey(d.getTime());
+      labels.push(key);
+      buckets[key] = { ai: 0, human: 0 };
+    }
+    (database.chatInteractions || []).forEach((i) => {
+      const key = this.dayKey(i.createdAt || i.ratedAt || Date.now());
+      if (!buckets[key]) return;
+      if (this.isKnowledgeAiInteraction(i)) buckets[key].ai += 1;
+    });
+    (database.tickets || []).forEach((t) => {
+      const key = this.dayKey(t.createdAt || t.fechaCreacion || Date.now());
+      if (!buckets[key]) return;
+      buckets[key].human += 1;
+    });
+    return {
+      labels: labels.map((key) => this.dayLabel(key)),
+      ai: labels.map((key) => buckets[key].ai),
+      human: labels.map((key) => buckets[key].human)
     };
   },
   platformUsageData() {
@@ -11365,6 +11489,14 @@ const App = {
     if (type === 'analytics') {
       if (this.mode === 'admin') {
         TrainingModule.renderStats?.();
+        ReportModule.render?.();
+      }
+    }
+    if (type === 'conversations') {
+      ChatModule.renderHistory?.();
+      if (currentConversationId) ChatModule.renderMessages?.();
+      if (this.mode === 'admin') {
+        AdminModule.render?.();
         ReportModule.render?.();
       }
     }
