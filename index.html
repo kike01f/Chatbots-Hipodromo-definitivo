@@ -1400,6 +1400,10 @@ body.mode-client #adminApp{display:none!important}
       </div>
     </div>
     <div class="form-group" id="ticketStatusGroup" style="display:none"><label>Estado</label><select id="tEstado"></select></div>
+    <div class="form-group full" id="ticketAdminResponseGroup" style="display:none">
+      <label>Respuesta al residente <span>(opcional, queda visible al consultar el ticket)</span></label>
+      <textarea id="tAdminResponse" placeholder="Escribe aquí la gestión o respuesta para el residente"></textarea>
+    </div>
     <div class="form-group full ticket-email-panel" id="ticketEmailPanel" style="display:none">
       <h4>Estado del correo</h4>
       <div id="ticketEmailStatus">—</div>
@@ -3214,6 +3218,32 @@ const ARTURITO_GADGET_KB_SEED = [
         console.warn('[Cloud] listResponsesViaRest:', err);
         return [];
       }
+    }
+
+    async addResponse(ticketId, response) {
+      if (!this.fb.isEnabled() || !ticketId) throw new Error('Firebase no conectado');
+      const { setDoc, doc } = this.fb._modules;
+      const now = Date.now();
+      const id = response?.id || `resp_${now}_${Math.random().toString(36).slice(2, 7)}`;
+      const payload = {
+        ticketId,
+        mensaje: String(response?.mensaje || '').trim(),
+        fecha: response?.fecha || now,
+        autorNombre: response?.autorNombre || 'Administración',
+        autorRol: response?.autorRol || 'Admin',
+        tipo: response?.tipo || (response?.estadoNuevo ? 'status_update' : 'comment'),
+        estadoNuevo: response?.estadoNuevo || null,
+        visibleToResidente: response?.visibleToResidente !== false,
+        adjuntos: response?.adjuntos || []
+      };
+      await setDoc(doc(this.fb.col('ticket_responses'), id), payload, { merge: true });
+      await this.update(ticketId, {
+        estado: response?.estadoNuevo || response?.ticketEstado || 'En Revisión',
+        prioridad: response?.prioridad || response?.ticketPrioridad || 'Media',
+        ultimaRespuesta: payload.mensaje,
+        ultimaRespuestaAt: payload.fecha
+      });
+      return { id, ...payload };
     }
 
     watchTicket(ticketId, callback, condominioId = null) {
@@ -9802,6 +9832,10 @@ const TicketModule = {
     document.getElementById('ticketModalTitle').textContent = 'Nueva solicitud';
     document.getElementById('ticketEditId').value = '';
     document.getElementById('ticketStatusGroup').style.display = 'none';
+    const responseGroup = document.getElementById('ticketAdminResponseGroup');
+    if (responseGroup) responseGroup.style.display = 'none';
+    const responseEl = document.getElementById('tAdminResponse');
+    if (responseEl) responseEl.value = '';
     const emailPanel = document.getElementById('ticketEmailPanel');
     if (emailPanel) emailPanel.style.display = 'none';
     document.getElementById('ticketForm').reset();
@@ -9819,6 +9853,10 @@ const TicketModule = {
     document.getElementById('ticketModalTitle').textContent = 'Editar solicitud ' + t.id;
     document.getElementById('ticketEditId').value = t.id;
     document.getElementById('ticketStatusGroup').style.display = '';
+    const responseGroup = document.getElementById('ticketAdminResponseGroup');
+    if (responseGroup) responseGroup.style.display = App.mode === 'admin' ? '' : 'none';
+    const responseEl = document.getElementById('tAdminResponse');
+    if (responseEl) responseEl.value = '';
     this.setModalPresentation('edit', t.id);
     document.getElementById('tNombre').value = t.nombre;
     document.getElementById('tDepto').value = t.departamento;
@@ -9846,6 +9884,7 @@ const TicketModule = {
       estado: editId ? document.getElementById('tEstado').value : 'Abierto',
       updatedAt: Date.now()
     };
+    const adminResponse = editId ? String(document.getElementById('tAdminResponse')?.value || '').trim() : '';
     const submitBtn = document.querySelector('#ticketForm button[type="submit"]');
     if (submitBtn) submitBtn.disabled = true;
     try {
@@ -9877,7 +9916,23 @@ const TicketModule = {
                 descripcion: data.descripcion,
                 adjuntos: attachments
               });
-            } catch (err) { console.warn('[Cloud] ticket update:', err); }
+              if (adminResponse && ArturitoCloud.tickets.addResponse) {
+                const response = await ArturitoCloud.tickets.addResponse(editId, {
+                  mensaje: adminResponse,
+                  estadoNuevo: data.estado,
+                  ticketEstado: data.estado,
+                  ticketPrioridad: data.prioridad,
+                  autorNombre: AuthModule.currentUser?.nombre || 'Administración',
+                  autorRol: AuthModule.currentUser?.rol || 'Admin'
+                });
+                database.tickets[idx].ultimaRespuesta = response.mensaje;
+                database.tickets[idx].ultimaRespuestaAt = response.fecha;
+              }
+            } catch (err) {
+              console.warn('[Cloud] ticket update:', err);
+              toast('No se pudo actualizar/responder el ticket en la nube. Revisa permisos Firestore.', 'error');
+              return;
+            }
           }
         }
         toast('Ticket actualizado', 'success');
