@@ -739,6 +739,9 @@ body.mode-client #adminApp{display:none!important}
 .ticket-timeline li.status-change{border-left:3px solid var(--primary)}
 .ticket-timeline-meta{font-size:.72rem;color:var(--text-muted);margin-bottom:.25rem;display:flex;gap:.5rem;flex-wrap:wrap}
 .ticket-timeline-msg{white-space:pre-wrap;line-height:1.45}
+.ticket-timeline-atts{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column;gap:.3rem}
+.ticket-timeline-atts li{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--text-muted)}
+.ticket-timeline-atts button{font-size:.72rem;padding:.2rem .45rem}
 .ticket-manage-compose{border:1px dashed var(--border);border-radius:12px;padding:.75rem;background:var(--bg)}
 .ticket-manage-compose label{font-size:.78rem;font-weight:600;color:var(--text-muted)}
 .ticket-response-tools{display:flex;flex-direction:column;gap:.45rem;margin-top:.45rem}
@@ -1473,6 +1476,17 @@ body.mode-client #adminApp{display:none!important}
             <label><input type="checkbox" id="tmCanalChat" checked> Chat (consulta de ticket)</label>
             <label><input type="checkbox" id="tmCanalEmail" checked> Correo al residente</label>
             <p class="ticket-hint" id="tmCanalHint">El residente verá la respuesta al consultar su número de ticket en el chat.</p>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Documentos para esta gestión <span>(opcional · máx. 5 archivos · 5 MB c/u)</span></label>
+          <div class="ticket-attach-zone">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnTmAttach"><span data-icon="document" data-icon-size="sm"></span> Adjuntar documentos</button>
+              <span class="ticket-hint">PDF, Word, Excel, imágenes, TXT</span>
+            </div>
+            <input type="file" id="tmFileInput" multiple hidden accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.txt,.xlsx,.xls">
+            <ul class="ticket-attach-list" id="tmAttachList"></ul>
           </div>
         </div>
         <div class="form-group full" style="display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap">
@@ -3300,7 +3314,7 @@ const ARTURITO_GADGET_KB_SEED = [
         tipo: response?.tipo || (response?.estadoNuevo ? 'status_update' : 'comment'),
         estadoNuevo: response?.estadoNuevo || null,
         visibleToResidente: response?.visibleToResidente !== false,
-        adjuntos: response?.adjuntos || []
+        adjuntos: (response?.adjuntos || []).map((a) => this.normalizeAttachment(a)).filter(Boolean)
       };
       await setDoc(doc(this.fb.col('ticket_responses'), id), payload, { merge: true });
       await this.update(ticketId, {
@@ -9693,6 +9707,7 @@ const TicketLookupModule = {
 const TicketManageModule = {
   _ticketId: null,
   _currentTicket: null,
+  _pendingFiles: [],
   emojis: ['OK','Listo','En revisión','Urgente'],
   templates: [
     { label: 'Recibido', text: 'Hemos recibido tu solicitud y la dejaremos en revisión.' },
@@ -9705,8 +9720,41 @@ const TicketManageModule = {
     document.getElementById('btnTicketManageSubmit')?.addEventListener('click', () => void this.submit());
     document.getElementById('tmCanalChat')?.addEventListener('change', () => this.updateCanalHint());
     document.getElementById('tmCanalEmail')?.addEventListener('change', () => this.updateCanalHint());
-    document.getElementById('tmEstado').innerHTML = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+    document.getElementById('btnTmAttach')?.addEventListener('click', () => document.getElementById('tmFileInput')?.click());
+    document.getElementById('tmFileInput')?.addEventListener('change', e => {
+      this.handleAddFiles(Array.from(e.target.files || []));
+      e.target.value = '';
+    });
+    document.getElementById('tmAttachList')?.addEventListener('click', async e => {
+      const dlUrl = e.target.closest('[data-dl-url]');
+      if (dlUrl) {
+        window.open(dlUrl.dataset.dlUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const dlPath = e.target.closest('[data-dl-path]');
+      if (dlPath) {
+        await TicketAttachmentModule.downloadFromCloud({ storagePath: dlPath.dataset.dlPath });
+        return;
+      }
+      const rm = e.target.closest('[data-rm-tm-pending]');
+      if (rm) {
+        this._pendingFiles.splice(+rm.dataset.rmTmPending, 1);
+        this.renderAttachmentList();
+      }
+    });
+    document.getElementById('ticketManageTimeline')?.addEventListener('click', async e => {
+      const dlUrl = e.target.closest('[data-dl-url]');
+      if (dlUrl) {
+        window.open(dlUrl.dataset.dlUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const dlPath = e.target.closest('[data-dl-path]');
+      if (dlPath) await TicketAttachmentModule.downloadFromCloud({ storagePath: dlPath.dataset.dlPath });
+    });
+    const estadoEl = document.getElementById('tmEstado');
+    if (estadoEl) estadoEl.innerHTML = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
     this.renderResponseTools();
+    this.renderAttachmentList();
   },
 
   renderResponseTools() {
@@ -9783,10 +9831,74 @@ const TicketManageModule = {
       ul.innerHTML = '<li class="ticket-manage-empty">Sin comentarios — publica la primera respuesta abajo</li>';
       return;
     }
-    ul.innerHTML = entries.map(r => `<li class="${r.estadoNuevo ? 'status-change' : ''}">
+    ul.innerHTML = entries.map(r => {
+      const atts = (r.adjuntos || []).map((a) => TicketAttachmentModule.normalize(a)).filter(Boolean);
+      const attsHtml = atts.length ? `<ul class="ticket-timeline-atts">${atts.map((a) => {
+        const attrs = a.url
+          ? `data-dl-url="${escapeHtml(a.url)}"`
+          : (a.storagePath ? `data-dl-path="${escapeHtml(a.storagePath)}"` : 'disabled');
+        return `<li>${docIcon(fileExt(a.name))}<span>${escapeHtml(a.name || 'documento')}${a.size ? ` · ${escapeHtml(formatBytes(a.size))}` : ''}</span><button type="button" class="btn btn-secondary btn-sm" ${attrs}>Abrir</button></li>`;
+      }).join('')}</ul>` : '';
+      return `<li class="${r.estadoNuevo ? 'status-change' : ''}">
       <div class="ticket-timeline-meta"><span>${fmtDate(r.fecha)}</span><strong>${escapeHtml(r.autorNombre || 'Administración')}</strong>${r.estadoNuevo ? `<span>Estado: ${escapeHtml(r.estadoNuevo)}</span>` : ''}</div>
       <div class="ticket-timeline-msg">${escapeHtml(r.mensaje || 'Actualización de estado')}</div>
-    </li>`).join('');
+      ${attsHtml}
+    </li>`;
+    }).join('');
+  },
+
+  resetAttachments() {
+    this._pendingFiles = [];
+    this.renderAttachmentList();
+  },
+
+  renderAttachmentList() {
+    const list = document.getElementById('tmAttachList');
+    if (!list) return;
+    list.innerHTML = this._pendingFiles.length
+      ? this._pendingFiles.map((file, i) => `<li class="ticket-attach-item pending">
+        <span class="ticket-attach-name">${docIcon(fileExt(file.name))}<span class="ticket-attach-filename">${escapeHtml(file.name)}</span><small>${formatBytes(file.size)}</small></span>
+        <button type="button" class="btn btn-secondary btn-sm" data-rm-tm-pending="${i}" title="Quitar">×</button>
+      </li>`).join('')
+      : '<li class="ticket-attach-empty">Sin documentos para esta gestión</li>';
+    const btn = document.getElementById('btnTmAttach');
+    if (btn) btn.disabled = this._pendingFiles.length >= TicketAttachmentModule.MAX_FILES;
+  },
+
+  handleAddFiles(files) {
+    const max = TicketAttachmentModule.MAX_FILES;
+    let added = 0;
+    for (const file of files) {
+      if (this._pendingFiles.length >= max) {
+        toast(`Máximo ${max} archivos por gestión`, 'error');
+        break;
+      }
+      const err = TicketAttachmentModule.validateFile(file);
+      if (err) { toast(err, 'error'); continue; }
+      if (this._pendingFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+      this._pendingFiles.push(file);
+      added++;
+    }
+    if (added) this.renderAttachmentList();
+  },
+
+  async uploadPendingAttachments(ticketId) {
+    const files = this._pendingFiles.slice();
+    if (!files.length) return [];
+    const metas = [];
+    for (const file of files) {
+      try {
+        metas.push(await TicketAttachmentModule.save(ticketId, file));
+      } catch (err) {
+        console.warn('[TicketManage] attachment upload:', file?.name, err);
+        toast(err.message || `No se pudo subir ${file?.name || 'un archivo'}`, 'error');
+      }
+    }
+    if (!metas.length) throw new Error('No se pudo subir ningún adjunto');
+    this._pendingFiles = [];
+    this.renderAttachmentList();
+    if (metas.length < files.length) toast('Algunos adjuntos no se pudieron subir', 'warning');
+    return metas;
   },
 
   async open(ticketId) {
@@ -9806,6 +9918,7 @@ const TicketManageModule = {
     }
     this._ticketId = ticketId;
     this._currentTicket = ticket;
+    this.resetAttachments();
     document.getElementById('ticketManageTitle').textContent = `Gestionar ${ticketId}`;
     document.getElementById('ticketManageSub').textContent = `${ticket.nombre || 'Residente'} · ${ticket.categoria || 'Sin categoría'}`;
     document.getElementById('tmEstado').value = ticket.estado || 'Abierto';
@@ -9823,11 +9936,12 @@ const TicketManageModule = {
 
   async submit() {
     const ticketId = this._ticketId;
-    const mensaje = document.getElementById('tmMensaje')?.value.trim();
+    let mensaje = document.getElementById('tmMensaje')?.value.trim();
     const estado = document.getElementById('tmEstado')?.value || 'En Revisión';
+    const hasPendingAttachments = this._pendingFiles.length > 0;
     if (!ticketId) return;
-    if (!mensaje) {
-      toast('Escribe una respuesta para el residente', 'warning');
+    if (!mensaje && !hasPendingAttachments) {
+      toast('Escribe una respuesta o adjunta al menos un documento', 'warning');
       return;
     }
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.tickets?.addResponse) {
@@ -9839,6 +9953,8 @@ const TicketManageModule = {
     try {
       const notifyChat = document.getElementById('tmCanalChat')?.checked !== false;
       const notifyEmail = document.getElementById('tmCanalEmail')?.checked === true;
+      const adjuntos = await this.uploadPendingAttachments(ticketId);
+      if (!mensaje && adjuntos.length) mensaje = 'Se adjuntaron documentos al ticket.';
       await ArturitoCloud.tickets.addResponse(ticketId, {
         mensaje,
         estadoNuevo: estado,
@@ -9848,6 +9964,7 @@ const TicketManageModule = {
         autorRol: AuthModule.currentUser?.rol || 'Admin',
         visibleToResidente: notifyChat,
         canales: [notifyChat ? 'chat' : null, notifyEmail ? 'email' : null].filter(Boolean),
+        adjuntos,
         fecha: Date.now()
       });
       const idx = database.tickets.findIndex(t => t.id === ticketId);
@@ -9862,6 +9979,7 @@ const TicketManageModule = {
       }
       DatabaseModule.save();
       document.getElementById('tmMensaje').value = '';
+      this.resetAttachments();
       await this.open(ticketId);
       TicketModule.render();
       AdminModule.render();
