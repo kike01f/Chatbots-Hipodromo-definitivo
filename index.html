@@ -729,6 +729,29 @@ body.mode-client #adminApp{display:none!important}
 .ticket-email-log{max-height:120px;overflow-y:auto;margin:.5rem 0 0;padding:0;list-style:none}
 .ticket-email-log li{padding:.25rem 0;border-bottom:1px dashed var(--border);font-size:.78rem;color:var(--text-muted)}
 
+.ticket-manage-modal{max-width:720px;max-height:min(92vh,880px);display:flex;flex-direction:column}
+.ticket-manage-body{overflow-y:auto;padding:1rem 1.15rem 1.25rem;display:flex;flex-direction:column;gap:1rem}
+.ticket-manage-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;font-size:.82rem}
+.ticket-manage-summary div{padding:.55rem .65rem;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.ticket-manage-summary strong{display:block;font-size:.72rem;color:var(--text-muted);font-weight:600;margin-bottom:.15rem}
+.ticket-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.55rem;max-height:220px;overflow-y:auto}
+.ticket-timeline li{padding:.65rem .75rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);font-size:.82rem}
+.ticket-timeline li.status-change{border-left:3px solid var(--primary)}
+.ticket-timeline-meta{font-size:.72rem;color:var(--text-muted);margin-bottom:.25rem;display:flex;gap:.5rem;flex-wrap:wrap}
+.ticket-timeline-msg{white-space:pre-wrap;line-height:1.45}
+.ticket-manage-compose{border:1px dashed var(--border);border-radius:12px;padding:.75rem;background:var(--bg)}
+.ticket-manage-compose label{font-size:.78rem;font-weight:600;color:var(--text-muted)}
+.ticket-response-tools{display:flex;flex-direction:column;gap:.45rem;margin-top:.45rem}
+.ticket-response-emoji-row,.ticket-response-template-row{display:flex;gap:.35rem;flex-wrap:wrap}
+.ticket-response-emoji,.ticket-response-template{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:999px;cursor:pointer;transition:all var(--transition)}
+.ticket-response-emoji{font-size:1.05rem;padding:.22rem .48rem;line-height:1.1}
+.ticket-response-template{font-size:.75rem;font-weight:700;padding:.35rem .65rem}
+.ticket-response-emoji:hover,.ticket-response-template:hover{border-color:var(--primary);color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,transparent);transform:translateY(-1px)}
+.ticket-manage-channels{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;padding:.65rem .75rem;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.ticket-manage-channels label{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:500;color:var(--text);cursor:pointer;margin:0}
+.ticket-manage-channels .ticket-hint{width:100%;margin:0;font-size:.75rem}
+.ticket-manage-empty{font-size:.82rem;color:var(--text-muted);padding:.5rem 0}
+
 #modalTicket .btn-primary .ui-icon,#modalTicket .btn-primary svg{color:#fff}
 @media(max-width:520px){
   #modalTicket .modal.ticket-modal{border-radius:20px 20px 16px 16px;max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - .5rem)}
@@ -1415,6 +1438,49 @@ body.mode-client #adminApp{display:none!important}
       <button type="submit" class="btn btn-primary"><span data-icon="send" data-icon-size="sm"></span> Enviar solicitud</button>
     </div>
   </form>
+  </div>
+</div></div>
+
+<div class="modal-overlay" id="modalTicketManage"><div class="modal ticket-manage-modal">
+  <div class="ticket-modal-header">
+    <div class="ticket-modal-header-main">
+      <div class="ticket-modal-icon" aria-hidden="true"><span data-icon="tickets" data-icon-size="lg"></span></div>
+      <h3 id="ticketManageTitle">Gestionar solicitud</h3>
+      <p class="ticket-modal-sub" id="ticketManageSub">Seguimiento y respuesta al residente</p>
+    </div>
+    <button type="button" class="modal-close" data-close="modalTicketManage" title="Cerrar">×</button>
+  </div>
+  <div class="ticket-manage-body">
+    <div class="ticket-manage-summary" id="ticketManageSummary"></div>
+    <div>
+      <h4 style="margin:0 0 .5rem;font-size:.88rem">Historial</h4>
+      <ul class="ticket-timeline" id="ticketManageTimeline"><li class="ticket-manage-empty">Sin comentarios aún</li></ul>
+    </div>
+    <div class="ticket-manage-compose">
+      <div class="form-grid" style="gap:.65rem">
+        <div class="form-group"><label>Estado del requerimiento</label><select id="tmEstado"></select></div>
+        <div class="form-group full">
+          <label>Respuesta / comentario al residente</label>
+          <textarea id="tmMensaje" rows="3" placeholder="Escribe la actualización que verá el residente al consultar su ticket…"></textarea>
+          <div class="ticket-response-tools" aria-label="Herramientas rápidas de respuesta">
+            <div class="ticket-response-emoji-row" id="tmEmojiRow"></div>
+            <div class="ticket-response-template-row" id="tmTemplateRow"></div>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Enviar respuesta por</label>
+          <div class="ticket-manage-channels" id="tmCanales">
+            <label><input type="checkbox" id="tmCanalChat" checked> Chat (consulta de ticket)</label>
+            <label><input type="checkbox" id="tmCanalEmail" checked> Correo al residente</label>
+            <p class="ticket-hint" id="tmCanalHint">El residente verá la respuesta al consultar su número de ticket en el chat.</p>
+          </div>
+        </div>
+        <div class="form-group full" style="display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap">
+          <button type="button" class="btn btn-secondary" data-close="modalTicketManage">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="btnTicketManageSubmit"><span data-icon="send" data-icon-size="sm"></span> Publicar respuesta</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div></div>
 
@@ -9623,6 +9689,193 @@ const TicketLookupModule = {
   }
 };
 
+/* ─── TicketManageModule — gestión admin con seguimiento separado ─── */
+const TicketManageModule = {
+  _ticketId: null,
+  _currentTicket: null,
+  emojis: ['OK','Listo','En revisión','Urgente'],
+  templates: [
+    { label: 'Recibido', text: 'Hemos recibido tu solicitud y la dejaremos en revisión.' },
+    { label: 'En revisión', text: 'Estamos revisando tu caso. Te informaremos cualquier avance por este mismo medio.' },
+    { label: 'En gestión', text: 'Tu requerimiento fue derivado para gestión. Gracias por tu paciencia.' },
+    { label: 'Resuelto', text: 'Tu solicitud fue resuelta. Si necesitas algo adicional, puedes crear una nueva solicitud.' }
+  ],
+
+  init() {
+    document.getElementById('btnTicketManageSubmit')?.addEventListener('click', () => void this.submit());
+    document.getElementById('tmCanalChat')?.addEventListener('change', () => this.updateCanalHint());
+    document.getElementById('tmCanalEmail')?.addEventListener('change', () => this.updateCanalHint());
+    document.getElementById('tmEstado').innerHTML = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+    this.renderResponseTools();
+  },
+
+  renderResponseTools() {
+    const emojiRow = document.getElementById('tmEmojiRow');
+    const templateRow = document.getElementById('tmTemplateRow');
+    if (emojiRow) {
+      emojiRow.innerHTML = this.emojis.map(text =>
+        `<button type="button" class="ticket-response-emoji" data-tm-text="${escapeHtml(text)}">${escapeHtml(text)}</button>`
+      ).join('');
+      emojiRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-tm-text]');
+        if (btn) this.insertMessageText(btn.dataset.tmText || '');
+      });
+    }
+    if (templateRow) {
+      templateRow.innerHTML = this.templates.map(item =>
+        `<button type="button" class="ticket-response-template" data-tm-template="${escapeHtml(item.text)}">${escapeHtml(item.label)}</button>`
+      ).join('');
+      templateRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-tm-template]');
+        if (btn) this.insertMessageText(btn.dataset.tmTemplate || '', true);
+      });
+    }
+  },
+
+  insertMessageText(text, asBlock = false) {
+    const textarea = document.getElementById('tmMensaje');
+    if (!textarea || !text) return;
+    const current = textarea.value || '';
+    const sep = asBlock && current.trim() ? '\n\n' : (current && !current.endsWith(' ') ? ' ' : '');
+    textarea.value = current + sep + text;
+    textarea.focus();
+  },
+
+  updateCanalHint() {
+    const ticket = this._currentTicket;
+    const hint = document.getElementById('tmCanalHint');
+    const emailCb = document.getElementById('tmCanalEmail');
+    if (!hint) return;
+    const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(ticket?.email || '').trim());
+    if (emailCb) {
+      emailCb.disabled = !hasEmail;
+      if (!hasEmail) emailCb.checked = false;
+    }
+    const chat = document.getElementById('tmCanalChat')?.checked;
+    const mail = document.getElementById('tmCanalEmail')?.checked;
+    if (!hasEmail) hint.textContent = 'Este residente no tiene correo válido; la respuesta quedará visible en la consulta del chat.';
+    else if (chat && mail) hint.textContent = 'Se publicará en el chat y se marcará para envío por correo al residente.';
+    else if (mail) hint.textContent = 'Se guardará como respuesta y se marcará para envío por correo.';
+    else hint.textContent = 'El residente verá la respuesta al consultar su número de ticket en el chat.';
+  },
+
+  renderSummary(ticket) {
+    const box = document.getElementById('ticketManageSummary');
+    if (!box || !ticket) return;
+    box.innerHTML = [
+      ['Ticket', ticket.id],
+      ['Residente', ticket.nombre || '—'],
+      ['Depto', ticket.departamento || '—'],
+      ['Categoría', ticket.categoria || '—'],
+      ['Prioridad', ticket.prioridad || '—'],
+      ['Estado', ticket.estado || '—'],
+      ['Correo', ticket.email || '—'],
+      ['Creado', fmtDate(ticket.createdAt)]
+    ].map(([k, v]) => `<div><strong>${k}</strong>${escapeHtml(v)}</div>`).join('');
+  },
+
+  renderTimeline(responses) {
+    const ul = document.getElementById('ticketManageTimeline');
+    if (!ul) return;
+    const entries = (responses || []).filter(r => r?.mensaje || r?.estadoNuevo)
+      .sort((a, b) => (a.fecha || 0) - (b.fecha || 0));
+    if (!entries.length) {
+      ul.innerHTML = '<li class="ticket-manage-empty">Sin comentarios — publica la primera respuesta abajo</li>';
+      return;
+    }
+    ul.innerHTML = entries.map(r => `<li class="${r.estadoNuevo ? 'status-change' : ''}">
+      <div class="ticket-timeline-meta"><span>${fmtDate(r.fecha)}</span><strong>${escapeHtml(r.autorNombre || 'Administración')}</strong>${r.estadoNuevo ? `<span>Estado: ${escapeHtml(r.estadoNuevo)}</span>` : ''}</div>
+      <div class="ticket-timeline-msg">${escapeHtml(r.mensaje || 'Actualización de estado')}</div>
+    </li>`).join('');
+  },
+
+  async open(ticketId) {
+    let ticket = database.tickets.find(t => t.id === ticketId);
+    let responses = [];
+    if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.tickets) {
+      try {
+        ticket = await ArturitoCloud.tickets.getById(ticketId, { forceServer: true }) || ticket;
+        responses = await ArturitoCloud.tickets.listResponses(ticketId, { forceServer: true });
+      } catch (err) {
+        console.warn('[TicketManage] load:', err);
+      }
+    }
+    if (!ticket) {
+      toast('No se encontró el ticket', 'error');
+      return;
+    }
+    this._ticketId = ticketId;
+    this._currentTicket = ticket;
+    document.getElementById('ticketManageTitle').textContent = `Gestionar ${ticketId}`;
+    document.getElementById('ticketManageSub').textContent = `${ticket.nombre || 'Residente'} · ${ticket.categoria || 'Sin categoría'}`;
+    document.getElementById('tmEstado').value = ticket.estado || 'Abierto';
+    document.getElementById('tmMensaje').value = '';
+    const chatCb = document.getElementById('tmCanalChat');
+    const emailCb = document.getElementById('tmCanalEmail');
+    if (chatCb) chatCb.checked = true;
+    if (emailCb) emailCb.checked = true;
+    this.renderSummary(ticket);
+    this.renderTimeline(responses);
+    this.updateCanalHint();
+    openModal('modalTicketManage');
+    hydrateIcons(document.getElementById('modalTicketManage'));
+  },
+
+  async submit() {
+    const ticketId = this._ticketId;
+    const mensaje = document.getElementById('tmMensaje')?.value.trim();
+    const estado = document.getElementById('tmEstado')?.value || 'En Revisión';
+    if (!ticketId) return;
+    if (!mensaje) {
+      toast('Escribe una respuesta para el residente', 'warning');
+      return;
+    }
+    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.tickets?.addResponse) {
+      toast('Firebase no está disponible para publicar la respuesta', 'error');
+      return;
+    }
+    const btn = document.getElementById('btnTicketManageSubmit');
+    if (btn) btn.disabled = true;
+    try {
+      const notifyChat = document.getElementById('tmCanalChat')?.checked !== false;
+      const notifyEmail = document.getElementById('tmCanalEmail')?.checked === true;
+      await ArturitoCloud.tickets.addResponse(ticketId, {
+        mensaje,
+        estadoNuevo: estado,
+        ticketEstado: estado,
+        ticketPrioridad: this._currentTicket?.prioridad || 'Media',
+        autorNombre: AuthModule.currentUser?.nombre || 'Administración',
+        autorRol: AuthModule.currentUser?.rol || 'Admin',
+        visibleToResidente: notifyChat,
+        canales: [notifyChat ? 'chat' : null, notifyEmail ? 'email' : null].filter(Boolean),
+        fecha: Date.now()
+      });
+      const idx = database.tickets.findIndex(t => t.id === ticketId);
+      if (idx >= 0) {
+        Object.assign(database.tickets[idx], {
+          estado,
+          ultimaRespuesta: mensaje,
+          ultimaRespuestaAt: Date.now(),
+          updatedAt: Date.now()
+        });
+        this._currentTicket = database.tickets[idx];
+      }
+      DatabaseModule.save();
+      document.getElementById('tmMensaje').value = '';
+      await this.open(ticketId);
+      TicketModule.render();
+      AdminModule.render();
+      ReportModule.render();
+      toast(notifyEmail ? 'Respuesta publicada y marcada para correo' : 'Respuesta publicada en el seguimiento del ticket', 'success');
+    } catch (err) {
+      console.warn('[TicketManage] submit:', err);
+      toast(err.message || 'No se pudo publicar la respuesta', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+};
+
 /* ─── TicketModule ─── */
 const TicketModule = {
   sortField: 'createdAt', sortDir: -1,
@@ -9725,7 +9978,7 @@ const TicketModule = {
       <td>${t.categoria}</td><td>${badgePriority(t.prioridad)}</td><td>${badgeStatus(t.estado)}</td>
       <td>${TicketEmailDebug.mailBadgeHtml(t.id)}</td>
       <td>${fmtDate(t.createdAt)}</td>
-      <td>${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}${actionBtn('trash', `TicketModule.remove('${t.id}')`, 'Eliminar', true)}</td>
+      <td>${actionBtn('eye', `TicketManageModule.open('${t.id}')`, 'Gestionar')}${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}${actionBtn('trash', `TicketModule.remove('${t.id}')`, 'Eliminar', true)}</td>
     </tr>`;
     }).join('') : '<tr><td colspan="9"><div class="empty-state">No hay tickets</div></td></tr>';
   },
@@ -11180,7 +11433,7 @@ const AdminModule = {
       return `<tr>
       <td><strong>${t.id}</strong>${TicketAttachmentModule.countForTicket(t) ? ` <span title="${TicketAttachmentModule.countForTicket(t)} adjunto(s)" style="opacity:.75">${icon('document','sm')}</span>` : ''}</td><td>${t.nombre}</td><td>${t.categoria}</td>
       <td>${badgePriority(t.prioridad)}</td><td>${badgeStatus(t.estado)}</td><td>${TicketEmailDebug.mailBadgeHtml(t.id)}</td><td>${fmtDate(t.createdAt)}</td>
-      <td>${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}</td>
+      <td>${actionBtn('eye', `TicketManageModule.open('${t.id}')`, 'Gestionar')}${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}</td>
     </tr>`;
     }).join('') : '<tr><td colspan="8"><div class="empty-state">Sin tickets</div></td></tr>';
   }
@@ -11677,6 +11930,7 @@ const App = {
     ChatModule.applyLiveSettings();
     SettingsModule.init();
     TicketModule.init();
+    TicketManageModule.init();
     TrainingModule.init();
     UserModule.init();
     AdminModule.init();
@@ -11686,6 +11940,7 @@ const App = {
     wrapSearchBoxes();
 
     window.TicketModule = TicketModule;
+    window.TicketManageModule = TicketManageModule;
     window.ChatModule = ChatModule;
     window.TrainingModule = TrainingModule;
     window.UserModule = UserModule;
