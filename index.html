@@ -4118,7 +4118,6 @@ const ARTURITO_GADGET_KB_SEED = [
       const gadgetUnsub = onSnapshot(
         this.fb.col('gadget_kb'),
         (snap) => {
-          if (this._pushing) return;
           const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
             .sort((a, b) => (a.order || 0) - (b.order || 0));
           if (!remote.length && !this._cloudKBActive && (database.gadgetKB?.length || 0) > 0) return;
@@ -4157,7 +4156,6 @@ const ARTURITO_GADGET_KB_SEED = [
       const analyticsUnsub = onSnapshot(
         this.fb.col('chat_interactions'),
         (snap) => {
-          if (this._pushing) return;
           const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
             .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
             .slice(-500);
@@ -4798,6 +4796,7 @@ const DatabaseModule = {
         ticketEmailMode: 'extension'
       }
     };
+    window.database = database;
   },
   /** Asegura que existan configuraciones y contadores */
   ensureDefaults(opts = {}) {
